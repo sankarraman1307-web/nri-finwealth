@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NRI FinWealth Dashboard</title>
+<script src="./support.js"></script>
+<script src="/_blob/f3fd43bd5b122fd8cc3c102e67dd5629"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+.btn{width:44px;height:44px;border-radius:12px;border:1px solid #BCC8D5;background:#fff;color:#0F1B2D;font-size:22px;font-weight:600;line-height:1}
+.btn:hover{background:#EEF3F8}
+.seg{height:44px;padding:0 20px;font-size:14px;font-weight:700;border:1px solid #BCC8D5}
+.ghost{height:44px;padding:0 16px;border-radius:12px;border:1px solid #BCC8D5;background:#fff;color:#0F1B2D;font-size:14px;font-weight:600}
+.ghost:hover{background:#EEF3F8}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+
+<div style="min-height: 100%; background: #F3F6F9; color: #0F1B2D; font-family: 'Manrope', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+  <!-- Top bar -->
+  <div style="background: #fff; border-bottom: 1px solid #E1E7EE">
+    <div style="max-width: 1240px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0F1B2D"></rect><path d="M7 21 L13 14 L18 18 L25 9" fill="none" stroke="#5FD0D8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="25" cy="9" r="2.4" fill="#5FD0D8"></circle></svg>
+        <div style="font-weight: 800; font-size: 18px; letter-spacing: -0.01em">NRI FinWealth</div>
+        <div style="font-size: 13px; color: #4A5A6D">Cross-border retirement planner</div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <div style="display: flex; align-items: center; gap: 6px; background: #E3F3F4; color: #0B5F67; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+          Your numbers stay on this device
+        </div>
+        <div style="background: #EEF2F6; color: #334155; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600">Tax rules as of {{meta.rulesDate}}</div>
+        <div style="background: #EEF2F6; color: #334155; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600">Planning estimate, not advice</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width: 1240px; margin: 0 auto; padding: 32px 24px 56px; display: flex; flex-direction: column; gap: 24px">
+
+    <!-- Title -->
+    <div style="display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: flex-end; justify-content: space-between">
+      <div style="min-width: 0">
+        <h1 style="margin: 0; font-size: 34px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 800">Will your money last?</h1>
+        <p style="margin: 6px 0 0; color: #4A5A6D; font-size: 16px">Sample household: age 45, partner and two children, living in the Netherlands, savings in both countries.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px">
+        <div style="background: #fff; border: 1px solid #E1E7EE; border-radius: 12px; padding: 10px 16px">
+          <div style="font-size: 12px; font-weight: 700; color: #4A5A6D; text-transform: uppercase; letter-spacing: 0.04em">Net worth today</div>
+          <div class="num" style="font-size: 20px; font-weight: 800">{{today.netWorth}}</div>
+        </div>
+        <div style="background: #fff; border: 1px solid #E1E7EE; border-radius: 12px; padding: 10px 16px">
+          <div style="font-size: 12px; font-weight: 700; color: #4A5A6D; text-transform: uppercase; letter-spacing: 0.04em">Emergency cash</div>
+          <div class="num" style="font-size: 20px; font-weight: 800">{{today.emergency}}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero + controls -->
+    <div style="display: flex; flex-wrap: wrap; gap: 24px">
+      <div style="flex: 1.5 1 520px; min-width: 0; background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px; display: flex; flex-wrap: wrap; gap: 28px; align-items: center">
+        <div style="position: relative; width: 176px; height: 176px; flex: none" role="img" aria-label="{{verdict.alt}}">
+          <svg width="176" height="176" viewBox="0 0 176 176" aria-hidden="true">
+            <circle cx="88" cy="88" r="72" fill="none" stroke="#E6ECF2" stroke-width="16"></circle>
+            <circle cx="88" cy="88" r="72" fill="none" stroke="{{verdict.color}}" stroke-width="16" stroke-linecap="round" stroke-dasharray="{{verdict.dash}}" transform="rotate(-90 88 88)"></circle>
+          </svg>
+          <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center">
+            <div class="num" style="font-size: 44px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; color: {{verdict.color}}">{{verdict.pct}}%</div>
+            <div style="font-size: 12px; font-weight: 600; color: #4A5A6D; margin-top: 4px">chance it lasts</div>
+          </div>
+        </div>
+        <div style="flex: 1 1 280px; min-width: 0">
+          <div style="display: inline-block; background: {{verdict.bg}}; color: {{verdict.color}}; border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 800; letter-spacing: 0.02em">{{verdict.label}}</div>
+          <h2 style="margin: 10px 0 8px; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; font-weight: 800">{{verdict.headline}}</h2>
+          <p style="margin: 0 0 8px; color: #334155">{{verdict.detail}}</p>
+          <p style="margin: 0; color: #4A5A6D; font-size: 14px">{{verdict.explain}}</p>
+        </div>
+      </div>
+
+      <div style="flex: 1 1 340px; min-width: 0; background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px; display: flex; flex-direction: column; gap: 20px">
+        <div style="font-size: 12px; font-weight: 800; color: #4A5A6D; text-transform: uppercase; letter-spacing: 0.06em">Try a different plan</div>
+
+        <div>
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px">Retire at age</div>
+          <div style="display: flex; align-items: center; gap: 12px">
+            <button class="btn" onClick="{{ctl.earlier}}" aria-label="Retire one year earlier">&#8722;</button>
+            <div class="num" style="min-width: 64px; text-align: center; font-size: 32px; font-weight: 800; letter-spacing: -0.02em">{{ctl.age}}</div>
+            <button class="btn" onClick="{{ctl.later}}" aria-label="Retire one year later">+</button>
+            <div style="font-size: 13px; color: #4A5A6D; margin-left: 4px">{{ctl.ageNote}}</div>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px">Retire in</div>
+          <div style="display: flex">
+            <button class="seg" style="{{ctl.nlStyle}}" onClick="{{ctl.pickNl}}">Netherlands</button>
+            <button class="seg" style="{{ctl.inStyle}}" onClick="{{ctl.pickIn}}">India</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px">Monthly spending</div>
+          <div style="display: flex; align-items: center; gap: 12px">
+            <button class="btn" onClick="{{ctl.spendLess}}" aria-label="Spend 10 percent less">&#8722;</button>
+            <div style="min-width: 120px; text-align: center">
+              <div class="num" style="font-size: 22px; font-weight: 800">{{ctl.spend}}</div>
+              <div style="font-size: 12px; color: #4A5A6D">{{ctl.spendNote}}</div>
+            </div>
+            <button class="btn" onClick="{{ctl.spendMore}}" aria-label="Spend 10 percent more">+</button>
+          </div>
+        </div>
+
+        <button class="ghost" style="align-self: flex-start" onClick="{{ctl.reset}}">Reset to sample plan</button>
+      </div>
+    </div>
+
+    <!-- Key numbers -->
+    <div style="display: flex; flex-wrap: wrap; gap: 16px">
+      <sc-for list="{{tiles}}" as="tile" hint-placeholder-count="4">
+        <div style="flex: 1 1 250px; min-width: 0; background: #fff; border: 1px solid #E1E7EE; border-radius: 16px; padding: 20px 22px">
+          <div style="font-size: 12px; font-weight: 800; color: #4A5A6D; text-transform: uppercase; letter-spacing: 0.05em">{{tile.label}}</div>
+          <div class="num" style="font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 4px 0 2px; color: {{tile.color}}">{{tile.value}}</div>
+          <div style="font-size: 13px; color: #4A5A6D">{{tile.sub}}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- Fan chart -->
+    <div style="background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px">
+      <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: flex-end; margin-bottom: 20px">
+        <div style="min-width: 0">
+          <h2 style="margin: 0; font-size: 22px; letter-spacing: -0.01em; font-weight: 800">How your wealth could unfold</h2>
+          <p style="margin: 4px 0 0; color: #4A5A6D; font-size: 14px">{{fan.sub}}</p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: #334155">
+          <div style="display: flex; align-items: center; gap: 8px"><span style="width: 22px; height: 3px; background: #0E7C86; border-radius: 2px; display: inline-block"></span>Typical future</div>
+          <div style="display: flex; align-items: center; gap: 8px"><span style="width: 22px; height: 12px; background: rgba(14,124,134,0.18); border-radius: 3px; display: inline-block"></span>Middle 80% of futures</div>
+        </div>
+      </div>
+      <div style="padding: 8px 8px 34px 64px">
+        <div style="position: relative; width: 100%; aspect-ratio: 760 / 300" role="img" aria-label="{{fan.alt}}">
+          <svg viewBox="0 0 760 300" preserveAspectRatio="none" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%" aria-hidden="true">
+            <path d="{{fan.grid}}" fill="none" stroke="#E3E9F0" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+            <path d="{{fan.area}}" fill="rgba(14,124,134,0.18)" stroke="none"></path>
+            <path d="{{fan.median}}" fill="none" stroke="#0E7C86" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+            <path d="{{fan.aowLine}}" fill="none" stroke="#7B8DA1" stroke-width="1.5" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"></path>
+            <path d="{{fan.retireLine}}" fill="none" stroke="#0F1B2D" stroke-width="1.5" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"></path>
+          </svg>
+          <sc-for list="{{fan.yLabels}}" as="yl" hint-placeholder-count="5">
+            <div class="num" style="position: absolute; left: -60px; width: 52px; text-align: right; top: {{yl.top}}; transform: translateY(-50%); font-size: 12px; color: #4A5A6D">{{yl.text}}</div>
+          </sc-for>
+          <sc-for list="{{fan.xLabels}}" as="xl" hint-placeholder-count="5">
+            <div class="num" style="position: absolute; top: 100%; margin-top: 8px; left: {{xl.left}}; transform: translateX(-50%); font-size: 12px; color: #4A5A6D">{{xl.text}}</div>
+          </sc-for>
+          <div style="position: absolute; top: 4px; left: {{fan.retireLeft}}; margin-left: 8px; background: #0F1B2D; color: #fff; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap">{{fan.retireText}}</div>
+          <div style="position: absolute; bottom: 6px; left: {{fan.aowLeft}}; margin-left: 8px; background: #E8EDF3; color: #334155; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap">{{fan.aowText}}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What would change this answer + retirement age -->
+    <div style="display: flex; flex-wrap: wrap; gap: 24px">
+      <div style="flex: 1 1 480px; min-width: 0; background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px">
+        <h2 style="margin: 0; font-size: 22px; letter-spacing: -0.01em; font-weight: 800">What would change this answer?</h2>
+        <p style="margin: 4px 0 20px; color: #4A5A6D; font-size: 14px">Change in your chance of success if one thing moves and nothing else does. Today: {{verdict.pct}}%.</p>
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <sc-for list="{{sens.rows}}" as="row" hint-placeholder-count="6">
+            <div>
+              <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; margin-bottom: 4px">
+                <span style="font-weight: 600">{{row.label}}</span>
+                <span class="num" style="color: {{row.color}}; font-weight: 800; white-space: nowrap">{{row.text}}</span>
+              </div>
+              <div style="position: relative; height: 12px; background: #EEF2F6; border-radius: 6px">
+                <div style="position: absolute; top: 0; bottom: 0; border-radius: 6px; background: {{row.color}}; left: {{row.left}}; width: {{row.width}}"></div>
+                <div style="position: absolute; top: -3px; bottom: -3px; left: 50%; width: 2px; background: #0F1B2D"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top: 22px; padding: 14px 16px; background: #FFF6E5; border-radius: 12px; font-size: 14px; color: #5B3A06">{{sens.flip}}</div>
+      </div>
+
+      <div style="flex: 1 1 480px; min-width: 0; background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px">
+        <h2 style="margin: 0; font-size: 22px; letter-spacing: -0.01em; font-weight: 800">When could you retire?</h2>
+        <p style="margin: 4px 0 20px; color: #4A5A6D; font-size: 14px">{{sweep.sub}}</p>
+        <div style="padding: 8px 8px 34px 52px">
+          <div style="position: relative; width: 100%; aspect-ratio: 520 / 240" role="img" aria-label="{{sweep.alt}}">
+            <svg viewBox="0 0 520 240" preserveAspectRatio="none" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%" aria-hidden="true">
+              <path d="{{sweep.grid}}" fill="none" stroke="#E3E9F0" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+              <path d="{{sweep.threshold}}" fill="none" stroke="#B4560A" stroke-width="1.5" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"></path>
+              <path d="{{sweep.line}}" fill="none" stroke="#0E7C86" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+            </svg>
+            <sc-for list="{{sweep.yLabels}}" as="yl" hint-placeholder-count="3">
+              <div class="num" style="position: absolute; left: -48px; width: 40px; text-align: right; top: {{yl.top}}; transform: translateY(-50%); font-size: 12px; color: #4A5A6D">{{yl.text}}</div>
+            </sc-for>
+            <sc-for list="{{sweep.xLabels}}" as="xl" hint-placeholder-count="6">
+              <div class="num" style="position: absolute; top: 100%; margin-top: 8px; left: {{xl.left}}; transform: translateX(-50%); font-size: 12px; color: #4A5A6D">{{xl.text}}</div>
+            </sc-for>
+            <div style="position: absolute; right: 0; top: {{sweep.thresholdTop}}; margin-top: -24px; font-size: 12px; font-weight: 700; color: #9A4A08">85% = on track</div>
+            <div style="position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #0F1B2D; border: 3px solid #fff; box-shadow: 0 0 0 2px #0F1B2D; left: {{sweep.dotLeft}}; top: {{sweep.dotTop}}; transform: translate(-50%, -50%)"></div>
+          </div>
+        </div>
+        <div style="margin-top: 4px; font-size: 14px; color: #334155">{{sweep.note}}</div>
+      </div>
+    </div>
+
+    <!-- Show the math + NRI insights -->
+    <div style="display: flex; flex-wrap: wrap; gap: 24px">
+      <div style="flex: 1.2 1 480px; min-width: 0; background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px">
+        <h2 style="margin: 0; font-size: 22px; letter-spacing: -0.01em; font-weight: 800">Show the math</h2>
+        <p style="margin: 4px 0 18px; color: #4A5A6D; font-size: 14px">{{math.sub}}</p>
+        <div style="font-size: 12px; font-weight: 800; color: #4A5A6D; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px">Going out</div>
+        <sc-for list="{{math.out}}" as="r" hint-placeholder-count="4">
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid #EDF1F5; font-size: 15px">
+            <span style="color: #334155">{{r.label}}</span><span class="num" style="font-weight: 700">{{r.value}}</span>
+          </div>
+        </sc-for>
+        <div style="display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; font-size: 15px; font-weight: 800"><span>Total spending</span><span class="num">{{math.total}}</span></div>
+        <div style="font-size: 12px; font-weight: 800; color: #4A5A6D; text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 6px">Coming in</div>
+        <sc-for list="{{math.inc}}" as="r" hint-placeholder-count="3">
+          <div style="display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid #EDF1F5; font-size: 15px">
+            <span style="color: #334155">{{r.label}}</span><span class="num" style="font-weight: 700">{{r.value}}</span>
+          </div>
+        </sc-for>
+        <div style="display: flex; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 14px 16px; background: #F3F6F9; border-radius: 12px; font-size: 16px; font-weight: 800"><span>Taken from your portfolio</span><span class="num">{{math.fromPortfolio}}</span></div>
+      </div>
+
+      <div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+        <div style="background: #0F1B2D; color: #fff; border-radius: 20px; padding: 28px">
+          <div style="font-size: 12px; font-weight: 800; color: #7FD6DD; text-transform: uppercase; letter-spacing: 0.06em">Most calculators miss this</div>
+          <h3 style="margin: 8px 0 8px; font-size: 20px; line-height: 1.3; font-weight: 800">{{insight.taxTitle}}</h3>
+          <p style="margin: 0; color: #D5DEE8; font-size: 15px">{{insight.taxBody}}</p>
+        </div>
+        <div style="background: #0F1B2D; color: #fff; border-radius: 20px; padding: 28px">
+          <div style="font-size: 12px; font-weight: 800; color: #7FD6DD; text-transform: uppercase; letter-spacing: 0.06em">Or this</div>
+          <h3 style="margin: 8px 0 8px; font-size: 20px; line-height: 1.3; font-weight: 800">{{insight.fxTitle}}</h3>
+          <p style="margin: 0; color: #D5DEE8; font-size: 15px">{{insight.fxBody}}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Honest limits -->
+    <div style="background: #fff; border: 1px solid #E1E7EE; border-radius: 20px; padding: 28px">
+      <h2 style="margin: 0; font-size: 22px; letter-spacing: -0.01em; font-weight: 800">What this model does not know yet</h2>
+      <p style="margin: 4px 0 18px; color: #4A5A6D; font-size: 14px">Estimates are labelled as estimates. If a rule is unconfirmed or not modelled, it shows up here instead of hiding inside a score.</p>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{warnings}}" as="w" hint-placeholder-count="6">
+          <div style="display: flex; gap: 14px; align-items: flex-start">
+            <div style="flex: none; width: 92px; text-align: center; border-radius: 999px; padding: 3px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.03em; background: {{w.bg}}; color: {{w.color}}">{{w.label}}</div>
+            <div style="min-width: 0; font-size: 14px; color: #334155">{{w.message}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="font-size: 13px; color: #4A5A6D; text-align: center; padding-top: 8px">
+      <div>{{meta.line}}</div>
+      <div style="margin-top: 4px">Education and planning only. This is not investment, tax or legal advice. Speak to a licensed adviser before acting.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":2700}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { retireAge: 55, dest: 'nl', spendPct: 0 };
+    this._k1 = null;
+    this._k2 = null;
+  }
+
+  renderVals() {
+    const E = window.NriEngine;
+    const s = this.state;
+    const base = E.SAMPLE_INPUT;
+    const f = 1 + s.spendPct / 100;
+    const input = Object.assign({}, base, {
+      retirementAge: s.retireAge,
+      retirementDestination: s.dest,
+      monthlyCoreSpend: base.monthlyCoreSpend * f,
+      annualLifestyleSpend: base.annualLifestyleSpend * f
+    });
+
+    const k1 = s.retireAge + '|' + s.dest + '|' + s.spendPct;
+    if (this._k1 !== k1) {
+      this._plan = E.runPlan(input, { paths: 400, sensitivities: true });
+      this._k1 = k1;
+    }
+    const k2 = s.dest + '|' + s.spendPct;
+    if (this._k2 !== k2) {
+      this._sweep = E.computeSweep(input, E.mergeAssumptions(), 300, this._plan.meta.seed);
+      this._k2 = k2;
+    }
+    const plan = this._plan;
+    const sweep = this._sweep;
+    const ex = plan.expected;
+    const horizonAge = base.age + plan.meta.horizonYears;
+
+    // ---------- formatting ----------
+    const MINUS = '−';
+    const eur = (n) => {
+      const a = Math.abs(n);
+      const sg = n < 0 ? MINUS : '';
+      if (a >= 1e6) return sg + '€' + (a / 1e6).toFixed(2) + 'M';
+      if (a >= 1e3) return sg + '€' + Math.round(a / 1e3) + 'k';
+      return sg + '€' + Math.round(a);
+    };
+    const eurFull = (n) => (n < 0 ? MINUS : '') + '€' + Math.round(Math.abs(n)).toLocaleString('en-US');
+    const mk = (pts) => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const nice = (v) => {
+      const e = Math.pow(10, Math.floor(Math.log10(v)));
+      const m = v / e;
+      return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * e;
+    };
+
+    // ---------- verdict ----------
+    const p = plan.monteCarlo.successProbability;
+    const pct = Math.round(p * 100);
+    const VS = {
+      on_track: { label: 'On track', color: '#0B6B73', bg: '#E3F3F4' },
+      borderline: { label: 'Borderline', color: '#8A4B06', bg: '#FEF0D5' },
+      at_risk: { label: 'At risk', color: '#B4330A', bg: '#FDE9E1' }
+    }[plan.verdict];
+    const circ = 2 * Math.PI * 72;
+    const gap = ex.margin;
+    const verdict = {
+      pct: pct,
+      label: VS.label,
+      color: VS.color,
+      bg: VS.bg,
+      dash: (p * circ).toFixed(1) + ' ' + circ.toFixed(1),
+      alt: pct + ' percent chance the money lasts to age ' + horizonAge + '. ' + VS.label + '.',
+      headline: 'In ' + pct + ' of 100 simulated futures, your money lasts to ' + horizonAge + '.',
+      detail: gap < 0
+        ? 'Retiring at ' + s.retireAge + ' you would need about ' + eur(ex.requiredCorpus) + ' and the plan projects ' + eur(ex.corpusAtRetirement) + '.'
+        : 'Retiring at ' + s.retireAge + ' you would need about ' + eur(ex.requiredCorpus) + ' and the plan projects ' + eur(ex.corpusAtRetirement) + ', a cushion of ' + eur(gap) + '.' +
+          (plan.verdict === 'on_track' ? '' : ' That holds on average, but a weak decade in the markets could still break it.'),
+      explain: ex.depletedAtAge !== null
+        ? 'In the typical case the money runs out at ' + ex.depletedAtAge + '.'
+        : 'In the typical case you still hold ' + eur(ex.endingLiquidReal) + ' in today’s money at ' + horizonAge + '.'
+    };
+
+    // ---------- controls ----------
+    const segOn = 'background: #0F1B2D; color: #fff; border-color: #0F1B2D;';
+    const segOff = 'background: #fff; color: #0F1B2D;';
+    const aow = 68;
+    const ctl = {
+      age: s.retireAge,
+      ageNote: s.retireAge < aow ? (aow - s.retireAge) + ' years before AOW' : 'AOW from ' + aow,
+      earlier: () => this.setState({ retireAge: Math.max(base.age + 1, s.retireAge - 1) }),
+      later: () => this.setState({ retireAge: Math.min(70, s.retireAge + 1) }),
+      nlStyle: (s.dest === 'nl' ? segOn : segOff) + ' border-radius: 12px 0 0 12px;',
+      inStyle: (s.dest === 'in' ? segOn : segOff) + ' border-radius: 0 12px 12px 0; border-left: none;',
+      pickNl: () => this.setState({ dest: 'nl' }),
+      pickIn: () => this.setState({ dest: 'in' }),
+      spend: eurFull(input.monthlyCoreSpend) + ' / mo',
+      spendNote: s.spendPct === 0 ? 'Sample household today' : (s.spendPct > 0 ? '+' : MINUS) + Math.abs(s.spendPct) + '% vs sample',
+      spendLess: () => this.setState({ spendPct: Math.max(-30, s.spendPct - 10) }),
+      spendMore: () => this.setState({ spendPct: Math.min(30, s.spendPct + 10) }),
+      reset: () => this.setState({ retireAge: 55, dest: 'nl', spendPct: 0 })
+    };
+
+    // ---------- today ----------
+    const essential = input.monthlyCoreSpend + input.dutchMortgageMonthlyPayment;
+    const today = {
+      netWorth: eur(plan.snapshot.netWorth),
+      emergency: (input.eurCash / essential).toFixed(1) + ' of 6 months'
+    };
+
+    // ---------- tiles ----------
+    const wr = ex.firstRetirementYear ? ex.firstRetirementYear.withdrawalRate : 0;
+    const tiles = [
+      { label: 'Projected at ' + s.retireAge, value: eur(ex.corpusAtRetirement), color: '#0F1B2D', sub: eur(ex.corpusAtRetirementReal) + ' in today’s money' },
+      { label: 'Needed at ' + s.retireAge, value: Number.isFinite(ex.requiredCorpus) ? eur(ex.requiredCorpus) : 'n/a', color: '#0F1B2D', sub: 'To last to age ' + horizonAge + ' in the typical case' },
+      { label: gap < 0 ? 'Shortfall' : 'Cushion', value: eur(Math.abs(gap)), color: gap < 0 ? '#B4330A' : '#0B6B73', sub: gap < 0 ? 'Not capped: you see the real gap' : 'Money left over beyond what is needed' },
+      { label: 'First-year drawdown', value: (wr * 100).toFixed(1) + '%', color: wr > 0.05 ? '#B4330A' : '#0F1B2D', sub: 'of your portfolio. Long retirements tend to hold up near 3 to 4%.' }
+    ];
+
+    // ---------- fan chart ----------
+    const W = 760, H = 300, T = 6;
+    const bands = plan.monteCarlo.bands;
+    const a0 = bands[0].age, a1 = bands[bands.length - 1].age;
+    let ymax = 0;
+    bands.forEach((b) => { if (b.p90 > ymax) ymax = b.p90; });
+    ymax = nice(Math.max(ymax, 1e5));
+    const X = (age) => ((age - a0) / (a1 - a0)) * W;
+    const Y = (v) => T + (1 - Math.min(v, ymax) / ymax) * (H - 2 * T);
+    const up = bands.map((b) => [X(b.age), Y(b.p90)]);
+    const lo = bands.map((b) => [X(b.age), Y(b.p10)]).reverse();
+    const gridSegs = [];
+    const yLabels = [];
+    for (let i = 0; i <= 4; i++) {
+      const v = (ymax * i) / 4;
+      const y = Y(v);
+      gridSegs.push('M0 ' + y.toFixed(1) + ' L' + W + ' ' + y.toFixed(1));
+      yLabels.push({ top: ((y / H) * 100).toFixed(2) + '%', text: eur(v) });
+    }
+    const xLabels = [];
+    for (let a = 50; a <= 90; a += 10) xLabels.push({ left: ((X(a) / W) * 100).toFixed(2) + '%', text: String(a) });
+    const rx = X(s.retireAge), ax = X(aow);
+    const fan = {
+      sub: 'Value of your savings in today’s euros, across ' + plan.meta.paths + ' simulated market and currency paths.',
+      alt: 'Fan chart of wealth by age. Typical path ends at ' + eur(bands[bands.length - 1].p50) + ' in today’s money at ' + a1 + '.',
+      grid: gridSegs.join(' '),
+      area: mk(up) + ' ' + mk(lo).replace('M', 'L') + ' Z',
+      median: mk(bands.map((b) => [X(b.age), Y(b.p50)])),
+      retireLine: 'M' + rx.toFixed(1) + ' 0 L' + rx.toFixed(1) + ' ' + H,
+      aowLine: 'M' + ax.toFixed(1) + ' 0 L' + ax.toFixed(1) + ' ' + H,
+      retireLeft: ((rx / W) * 100).toFixed(2) + '%',
+      aowLeft: ((ax / W) * 100).toFixed(2) + '%',
+      retireText: 'Retire ' + s.retireAge,
+      aowText: 'AOW ' + aow,
+      yLabels: yLabels,
+      xLabels: xLabels
+    };
+
+    // ---------- sensitivities ----------
+    const rowsRaw = (plan.sensitivities || []).filter((r) => r.id !== 'flip-destination');
+    rowsRaw.sort((x, y) => y.delta - x.delta);
+    const maxAbs = Math.max(0.05, ...rowsRaw.map((r) => Math.abs(r.delta)));
+    const sensRows = rowsRaw.map((r) => {
+      const w = Math.max(1.5, (Math.abs(r.delta) / maxAbs) * 50);
+      const d = Math.round(r.delta * 100);
+      return {
+        label: r.label,
+        text: (d > 0 ? '+' : d < 0 ? MINUS : '') + Math.abs(d) + (Math.abs(d) === 1 ? ' pt' : ' pts') + ' → ' + Math.round(r.successProbability * 100) + '%',
+        color: r.delta >= 0 ? '#0E7C86' : '#C2410C',
+        left: (r.delta >= 0 ? 50 : 50 - w).toFixed(1) + '%',
+        width: w.toFixed(1) + '%'
+      };
+    });
+    const flipRaw = (plan.sensitivities || []).find((r) => r.id === 'flip-destination');
+    const sens = {
+      rows: sensRows,
+      flip: flipRaw
+        ? 'Retiring in ' + (s.dest === 'nl' ? 'India instead' : 'the Netherlands instead') + ' would give a ' + Math.round(flipRaw.successProbability * 100) + '% chance. ' +
+          (s.dest === 'nl' ? 'Treat that as optimistic: Indian income tax, capital gains tax and private healthcare are not modelled yet.' : 'Compare it with the India result above, which leaves out Indian taxes.')
+        : ''
+    };
+
+    // ---------- retirement age sweep ----------
+    const SW = 520, SH = 240;
+    const sa0 = sweep[0].retirementAge, sa1 = sweep[sweep.length - 1].retirementAge;
+    const SX = (a) => ((a - sa0) / (sa1 - sa0)) * SW;
+    const SY = (q) => T + (1 - q) * (SH - 2 * T);
+    const sgrid = [0, 0.5, 1].map((q) => 'M0 ' + SY(q).toFixed(1) + ' L' + SW + ' ' + SY(q).toFixed(1)).join(' ');
+    const sxl = [];
+    for (let a = 45; a <= 70; a += 5) if (a >= sa0 && a <= sa1) sxl.push({ left: ((SX(a) / SW) * 100).toFixed(2) + '%', text: String(a) });
+    const earliest = sweep.find((q) => q.successProbability >= 0.85);
+    const ca = Math.min(Math.max(s.retireAge, sa0), sa1);
+    const sweepOut = {
+      sub: 'Chance your money lasts to ' + horizonAge + ', for each possible retirement age, with everything else as set above.',
+      alt: 'Chance of success by retirement age, from ' + Math.round(sweep[0].successProbability * 100) + ' percent at ' + sa0 + ' to ' + Math.round(sweep[sweep.length - 1].successProbability * 100) + ' percent at ' + sa1 + '.',
+      grid: sgrid,
+      threshold: 'M0 ' + SY(0.85).toFixed(1) + ' L' + SW + ' ' + SY(0.85).toFixed(1),
+      thresholdTop: ((SY(0.85) / SH) * 100).toFixed(2) + '%',
+      line: mk(sweep.map((q) => [SX(q.retirementAge), SY(q.successProbability)])),
+      yLabels: [0, 0.5, 1].map((q) => ({ top: ((SY(q) / SH) * 100).toFixed(2) + '%', text: Math.round(q * 100) + '%' })),
+      xLabels: sxl,
+      dotLeft: ((SX(ca) / SW) * 100).toFixed(2) + '%',
+      dotTop: ((SY(p) / SH) * 100).toFixed(2) + '%',
+      note: earliest
+        ? 'The earliest age that reaches an 85% chance is ' + earliest.retirementAge + '.'
+        : 'No retirement age up to ' + sa1 + ' reaches an 85% chance with these settings.'
+    };
+
+    // ---------- show the math ----------
+    const row = ex.rows.find((r) => r.age === s.retireAge) || ex.rows[0];
+    const pensionNet = row.pensionGross - row.pensionTax;
+    const math = {
+      sub: 'The year you retire, at age ' + s.retireAge + ', in future euros after inflation. Every figure here comes from the same engine as the chart above.',
+      out: [
+        { label: 'Core living costs' + (s.dest === 'in' ? ' (India cost level)' : ''), value: eurFull(row.coreSpend) },
+        { label: 'Holidays and discretionary', value: eurFull(row.lifestyleSpend) },
+        { label: 'Mortgage payments', value: eurFull(row.mortgagePayments) },
+        { label: 'Dutch wealth tax (Box 3)', value: eurFull(row.box3Tax) }
+      ],
+      total: eurFull(row.totalSpend + row.box3Tax),
+      inc: [
+        { label: 'State and workplace pensions, after tax', value: eurFull(pensionNet) },
+        { label: 'Rental and business income, after tax', value: eurFull(row.passiveNet) }
+      ],
+      fromPortfolio: eurFull(Math.max(0, -row.netFlow))
+    };
+
+    // ---------- insights ----------
+    const box3Now = ex.rows[0].box3Tax;
+    const yrs = Math.max(0, s.retireAge - base.age);
+    const fxDrift = 0.025;
+    const crToday = 1e7 / base.eurToInr;
+    const crLater = 1e7 / (base.eurToInr * Math.pow(1 + fxDrift, yrs));
+    const insight = {
+      taxTitle: s.dest === 'nl'
+        ? 'Box 3 takes about ' + eur(box3Now) + ' this year and ' + eur(row.box3Tax) + ' in your first year of retirement.'
+        : 'Retiring to India ends Dutch Box 3, but not your tax bill.',
+      taxBody: s.dest === 'nl'
+        ? 'Indian property, deposits and funds count towards your Dutch Box 3 base. The state taxes an assumed return on them, 6% on investments in 2026, whatever they really earn.'
+        : 'Your Dutch wealth tax stops once you leave, but Indian income and capital gains tax apply instead. That side is not modelled yet, so read the India result as a best case.',
+      fxTitle: s.dest === 'nl'
+        ? '₹1 crore is worth ' + eur(crToday) + ' today and about ' + eur(crLater) + ' at ' + s.retireAge + '.'
+        : 'In India, rupee assets pay rupee bills.',
+      fxBody: s.dest === 'nl'
+        ? 'That assumes the rupee keeps slipping 2.5% a year against the euro. If you will spend euros, every rupee asset carries a currency bet you did not choose to make.'
+        : 'A falling rupee hurts you far less than the exchange rate suggests, because your costs fall in euro terms too. Your euro savings are the exposed part.'
+    };
+
+    // ---------- warnings ----------
+    const WS = {
+      important: { label: 'Important', bg: '#FDE9E1', color: '#9A2F0A' },
+      caution: { label: 'Caution', bg: '#FEF0D5', color: '#7A4306' },
+      info: { label: 'Note', bg: '#E8EEF4', color: '#334155' }
+    };
+    const warnings = plan.warnings.slice(0, 9).map((w) => ({
+      label: WS[w.severity].label,
+      bg: WS[w.severity].bg,
+      color: WS[w.severity].color,
+      message: w.message
+    }));
+
+    return {
+      meta: {
+        rulesDate: new Date(plan.meta.rulesAsOf + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        line: 'Engine v' + plan.meta.engineVersion + ' · ' + plan.meta.paths + ' simulated futures · fixed seed ' + plan.meta.seed + ' (same inputs, same answer) · exchange rate assumed ₹' + base.eurToInr + ' per €1'
+      },
+      today: today,
+      verdict: verdict,
+      ctl: ctl,
+      tiles: tiles,
+      fan: fan,
+      sens: sens,
+      sweep: sweepOut,
+      math: math,
+      insight: insight,
+      warnings: warnings
+    };
+  }
+}
+</script>
+</body>
+</html>
