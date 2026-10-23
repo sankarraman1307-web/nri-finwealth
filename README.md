@@ -24,7 +24,7 @@ npm run build      # production build into dist/
 
 Tax rules change. If you find a wrong rule or number, open an issue with the source (law text or official page). Corrections from local advisers are especially welcome.
 
-Licence: MIT.
+Licence: GNU AGPL-3.0-or-later (see `LICENSE`). You may use and change the code, but if you run a modified version as a website you must publish your changes under the same licence. The name "NRI FinWealth" is not licensed for use by others.
 
 ---
 
