@@ -131,6 +131,7 @@ export default function App() {
     <main className="page">
       <header className="top">
         <strong>NRI FinWealth</strong>
+        <span className="beta" title="Beta: we are still checking the tax figures with advisers">Beta</span>
       </header>
 
       <h1>Where could you retire comfortably: the Netherlands, India, or both?</h1>
@@ -143,7 +144,7 @@ export default function App() {
         </svg>
         <div>
           <strong>Your numbers stay on this device.</strong>
-          <span> No account, no server and no tracking: everything is calculated in your browser, and nothing you type is sent anywhere.</span>
+          <span> No account and no tracking of your answers: everything is calculated in your browser, and nothing you type is sent anywhere.</span>
         </div>
       </div>
 
@@ -198,8 +199,9 @@ export default function App() {
         Planning estimate, not advice. Tax rules as of {shown?.plan.meta.rulesAsOf ?? '2026-10-22'}. Engine v{shown?.plan.meta.engineVersion ?? '2.1.0'} &middot; {shown?.plan.meta.paths ?? 400} simulated futures.
         <details className="about">
           <summary>Privacy and disclaimer</summary>
-          <p><strong>Your numbers stay with you.</strong> All calculations run in your browser. Nothing you type is sent to a server, and there is no account or tracking. The only outside call fetches the public euro-to-rupee rate; it carries none of your data. Your answers are saved only in this browser (local storage); clear your site data to remove them.</p>
-          <p><strong>Not financial, tax or legal advice.</strong> This is a planning tool that shows what could happen under stated assumptions. Tax rules change (for example the Dutch Box 3 reform), some figures are proposals, and Indian tax and healthcare costs are only partly modelled. Check the result with a licensed adviser before you act on it.</p>
+          <p><strong>Your numbers stay with you.</strong> All calculations run in your browser. Nothing you type is sent to a server, and the tool has no account and no tracking of its own. Your answers are saved only in this browser (local storage); clear your site data to remove them. The only outside call fetches the public euro-to-rupee rate; it carries none of your data. Our hosting provider, Cloudflare, keeps standard anonymous traffic counts, as any website host does.</p>
+          <p><strong>Beta.</strong> This tool is still being tested and its tax figures are still being checked by advisers. Expect mistakes, and tell us when you find one.</p>
+          <p><strong>Not financial, tax or legal advice.</strong> This is an educational planning tool. It shows what could happen under stated assumptions and gives general what-if scenarios. It does not know your full situation, and it does not recommend any bank, investment product or insurance. Tax rules change (for example the Dutch Box 3 reform), some figures are proposals, and Indian tax and healthcare costs are only partly modelled. Past or simulated results do not predict the future. Check the result with a licensed adviser before you act on it. We accept no liability for decisions made using this tool.</p>
           <p>nrifinwealth.com is open source under the AGPL-3.0 licence. <a href="https://github.com/sankarraman1307-web/nri-finwealth" target="_blank" rel="noreferrer">Source code</a>. Spotted a wrong rule or number? Please report it there.</p>
         </details>
       </footer>
@@ -502,6 +504,9 @@ function Results(props: {
         </div>
       </div>
 
+      <p className="notice" role="note">
+        <strong>Beta, a planning estimate.</strong> These are what-if scenarios under stated assumptions, not financial, tax or legal advice. Tax rules are still being checked by advisers. Please check anything important with a licensed adviser before you act on it.
+      </p>
       <div className="tabs" role="tablist" aria-label="Results">
         {slides.map((sl, i) => (
           <button key={sl.id} type="button" role="tab" id={`tab-${sl.id}`} aria-selected={!all && slide === i} aria-controls={`slide-${sl.id}`} className={!all && slide === i ? 'tab on' : 'tab'} onClick={() => { setAll(false); go(i); }}>
