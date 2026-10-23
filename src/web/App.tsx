@@ -131,11 +131,21 @@ export default function App() {
     <main className="page">
       <header className="top">
         <strong>NRI FinWealth</strong>
-        <span className="pill">Your numbers stay on this device</span>
       </header>
 
-      <h1>Where could you retire comfortably between EU and India?</h1>
-      <p className="sub">Free, personalized and calculated safely on your own device</p>
+      <h1>Where could you retire comfortably: the Netherlands, India, or both?</h1>
+      <p className="sub">Free, personalised and calculated on your own device. Built for NRIs living in the Netherlands. Belgium, Luxembourg, Germany, Austria, Switzerland, France and the UK are next.</p>
+
+      <div className="privacy" role="note">
+        <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+        <div>
+          <strong>Your numbers stay on this device.</strong>
+          <span> No account, no server and no tracking: everything is calculated in your browser, and nothing you type is sent anywhere.</span>
+        </div>
+      </div>
 
       <div className="layout">
         <QuickStart

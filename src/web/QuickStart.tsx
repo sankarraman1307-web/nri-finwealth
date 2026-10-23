@@ -391,7 +391,7 @@ export default function QuickStart({ profile, errors, propertyErrors, pensionErr
     <aside className="panel" aria-label="Your details">
 
       <h2 className="panelTitle">Your details</h2>
-      <p className="muted">Open a group, change your answers, then press Run simulation. Your numbers never leave this device.</p>
+      <p className="muted">Open a group, change your answers, then press Run simulation.</p>
       <div className="gtools">
         <button type="button" className="linkbtn" onClick={() => onSetAll(true)}>Open all</button>
         <button type="button" className="linkbtn" onClick={() => onSetAll(false)}>Close all</button>

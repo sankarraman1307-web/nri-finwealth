@@ -259,3 +259,8 @@ button.run:disabled { opacity: 0.6; cursor: progress; }
 footer .about { max-width: 640px; margin: 12px auto 0; text-align: left; font-size: 13px; }
 footer .about summary { cursor: pointer; text-align: center; }
 footer .about p { margin: 8px 0; line-height: 1.5; }
+
+.privacy { display: flex; gap: 14px; align-items: center; background: #e6f6ec; border: 1px solid #9fd6b3; color: #14532d; border-radius: 14px; padding: 14px 18px; margin: 0 0 20px; font-size: 15px; line-height: 1.45; }
+.privacy svg { flex: none; }
+.privacy strong { font-weight: 800; }
+@media (max-width: 600px) { .privacy { padding: 12px 14px; font-size: 14px; } }
