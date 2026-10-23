@@ -127,7 +127,7 @@ export default function Recommend(props: {
             Even the strongest mix I tried ({rec.comboBest.label.toLowerCase()}) only reaches {pct(rec.comboBest.success)}. The gap is too big for small adjustments: look at the size of your savings, your income, or a very different plan for where you retire.
           </p>
         ) : null}
-        <p className="muted small">Each result comes from 300 simulated futures, so small differences are noise. Applying a change updates your answers on the left, and you can undo it.</p>
+        <p className="muted small">Each result comes from 300 simulated futures, so small differences are noise. Applying a change updates your answers in the form, and you can undo it.</p>
       </section>
       {rec.levers.map((l) => (
         <Lever key={l.id} l={l} base={rec.base} safe={rec.safe} onApply={onApply} />

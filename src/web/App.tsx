@@ -167,7 +167,7 @@ export default function App() {
           {notice ? <div className="card alert" role="alert">{notice}</div> : null}
           {dirty ? (
             <div className="stale" role="status">
-              <span>You changed your answers. The results below are from your last run.</span>
+              <span>You changed your answers. The results here are from your last run.</span>
               <button type="button" className="run" disabled={running} onClick={run}>
                 {running ? 'Running…' : 'Run simulation'}
               </button>
@@ -178,7 +178,7 @@ export default function App() {
           ) : (
             <div className="card empty">
               <h2>Your results will appear here</h2>
-              <p>Open a group on the left, fill in what you know, and press <strong>Run simulation</strong>. Only age, the age you want to stop working, years in the Netherlands, salary and monthly spending are required. Leave anything else blank if it does not apply.</p>
+              <p>Open a group in the form, fill in what you know, and press <strong>Run simulation</strong>. Only age, the age you want to stop working, years in the Netherlands, salary and monthly spending are required. Leave anything else blank if it does not apply.</p>
             </div>
           )}
         </div>
@@ -282,8 +282,8 @@ function Results(props: {
             Retiring at {retireAge} the plan projects {formatEur(plan.expected.corpusAtRetirement * toBasis)} ({unit})
             {soldAtStop > 1000 ? `, including ${formatEur(soldAtStop)} from selling property that year` : ''}.{' '}
             {noSavingsNeeded
-              ? `You would not need savings on the day you stop: your pensions, rent and later property sales already pay for your spending to ${horizonAge}, if returns are exactly average. The first chart below uses a more cautious test.`
-              : `If returns are exactly average, about ${formatEur(plan.expected.requiredCorpus * toBasis)} would be just enough to last to ${horizonAge}. The first chart below uses a more cautious test.`}
+              ? `You would not need savings on the day you stop: your pensions, rent and later property sales already pay for your spending to ${horizonAge}, if returns are exactly average. The Savings over time slide uses a more cautious test.`
+              : `If returns are exactly average, about ${formatEur(plan.expected.requiredCorpus * toBasis)} would be just enough to last to ${horizonAge}. The Savings over time slide uses a more cautious test.`}
             {earliest !== null && earliest < retireAge ? ` On average returns you could stop as early as ${earliest}.` : ''}
             {earliest !== null && earliest > retireAge ? ` On average returns, the earliest age that fully works is ${earliest}.` : ''}
             {earliest === null ? ' On average returns, no retirement age up to 75 fully works.' : ''}
@@ -401,7 +401,7 @@ function Results(props: {
       <section className="card">
         <h3>What you need each month and what you would get</h3>
         <p className="muted tabnote">
-          Your monthly spending at each age, with inflation and the prices of the country you retire to, against pensions and rent plus {pctText(rate)} a year drawn from the corpus above, divided by 12. Amber shows any
+          Your monthly spending at each age, with inflation and the prices of the country you retire to, against pensions and rent plus {pctText(rate)} a year drawn from the corpus on the Savings over time slide, divided by 12. Amber shows any
           shortfall. The chart starts at the age you stop working. Point at an age to see what changes then.
         </p>
         <MonthlyChart series={series} retireAge={retireAge} aowAge={aowAge} rate={rate} events={view.events} />
