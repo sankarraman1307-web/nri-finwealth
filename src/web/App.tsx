@@ -200,7 +200,7 @@ export default function App() {
           <summary>Privacy and disclaimer</summary>
           <p><strong>Your numbers stay with you.</strong> All calculations run in your browser. Nothing you type is sent to a server, and there is no account or tracking. The only outside call fetches the public euro-to-rupee rate; it carries none of your data. Your answers are saved only in this browser (local storage); clear your site data to remove them.</p>
           <p><strong>Not financial, tax or legal advice.</strong> This is a planning tool that shows what could happen under stated assumptions. Tax rules change (for example the Dutch Box 3 reform), some figures are proposals, and Indian tax and healthcare costs are only partly modelled. Check the result with a licensed adviser before you act on it.</p>
-          <p>Open source under the AGPL-3.0 licence. <a href="https://github.com/sankarraman1307-web/nri-finwealth" target="_blank" rel="noreferrer">Source code</a>. Spotted a wrong rule or number? Please report it there.</p>
+          <p>nrifinwealth.com is open source under the AGPL-3.0 licence. <a href="https://github.com/sankarraman1307-web/nri-finwealth" target="_blank" rel="noreferrer">Source code</a>. Spotted a wrong rule or number? Please report it there.</p>
         </details>
       </footer>
     </main>

@@ -2,7 +2,7 @@
 
 Free, private retirement planner for NRIs living in Europe. Netherlands and India first; Belgium, Luxembourg, Germany, Austria, Switzerland, France and the UK are planned.
 
-Everything runs in your browser. No server, no account, no tracking. This is a planning estimate, not financial, tax or legal advice.
+Live at https://nrifinwealth.com. Everything runs in your browser. No server, no account, no tracking. This is a planning estimate, not financial, tax or legal advice.
 
 ## Run it
 
