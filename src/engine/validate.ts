@@ -67,7 +67,8 @@ export function validateInput(input: PlanInput, planToAge = 95): ValidationIssue
     if (x.loan) {
       if (!(x.loan.balance >= 0) || !(x.loan.paymentMonthly >= 0)) err('properties', 'A loan balance or payment cannot be negative');
       if (!(x.loan.yearsLeft >= 0 && x.loan.yearsLeft <= 50)) err('properties', 'Loan years left must be between 0 and 50');
-      if (x.value <= 0) err('properties', 'A loan needs a property with a value');
+      // A loan needs a value only when the property is to be sold; a home you keep can carry a payment alone.
+      if (x.value <= 0 && x.sellAtAge !== undefined) err('properties', 'A loan needs a property with a value');
     }
     if (x.sellAtAge !== undefined && x.sellAtAge >= planToAge) err('properties', 'Sale age must be below the planning age');
   }

@@ -6,6 +6,8 @@ export interface MonteCarloResult {
   successProbability: number;
   bands: BandPoint[];
   p10DepletionAge: number | null;
+  /** Typical (median) age at which the money runs out, among the paths that do run out. Null if none do. */
+  medianFailAge: number | null;
   paths: number;
 }
 
@@ -44,5 +46,11 @@ export function runMonteCarlo(ctx: SimContext, paths: number, seed: number): Mon
     p10DepletionAge = sorted[Math.max(0, Math.ceil(paths * 0.1) - 1)] ?? null;
   }
 
-  return { successProbability: ok / paths, bands, p10DepletionAge, paths };
+  let medianFailAge: number | null = null;
+  if (depletion.length > 0) {
+    const sorted = [...depletion].sort((x, y) => x - y);
+    medianFailAge = sorted[Math.floor((sorted.length - 1) / 2)] ?? null;
+  }
+
+  return { successProbability: ok / paths, bands, p10DepletionAge, medianFailAge, paths };
 }

@@ -1,5 +1,6 @@
+import QuickQuestions, { AccuracyPanel, boosters } from './QuickQuestions';
 import { countryPack } from '../engine';
-import { INDIA_HOME_FACTOR, ASSUMPTION_FIELDS, assumptionDefault, newPension, EARLY_PENSION_CUT_PER_YEAR, GOLD_PRICE_AS_OF, withDestination, formatEur, formatEurFull, formatInr, newProperty, parseMoney, type Currency, type Profile, type ProfileErrors, type PensionErrors, type PensionRow, type PropertyErrors, type PropertyRow } from './profile';
+import { INDIA_HOME_FACTOR, mortgageSummary, ASSUMPTION_FIELDS, assumptionDefault, newPension, EARLY_PENSION_CUT_PER_YEAR, GOLD_PRICE_AS_OF, withDestination, formatEur, formatEurFull, formatInr, newProperty, parseMoney, type Currency, type Profile, type ProfileErrors, type PensionErrors, type PensionRow, type PropertyErrors, type PropertyRow } from './profile';
 
 interface Props {
   profile: Profile;
@@ -10,6 +11,11 @@ interface Props {
   eurToInr: number;
   rateIsLive: boolean;
   onChange: (next: Profile) => void;
+  /** Edits made on the quick questions: these update the answer by themselves, without pressing Run. */
+  /** Errors for the quick questions, shown as you type (the groups below only show theirs after a Run). */
+  liveErrors: ProfileErrors;
+  onQuickChange: (next: Profile) => void;
+  onOpenGroup: (id: string) => void;
   onClearMine: () => void;
   open: Record<string, boolean>;
   onToggle: (id: string) => void;
@@ -34,7 +40,7 @@ export const GROUPS: { id: string; title: string; fields: (keyof Profile)[] }[] 
 
 export const groupOfField = (field: string): string | undefined => GROUPS.find((g) => (g.fields as string[]).includes(field))?.id;
 
-function Group(props: { id: string; n: number; title: string; summary: string; open: boolean; hasError: boolean; onToggle: () => void; children: React.ReactNode }) {
+function Group(props: { id: string; n: number; title: string; summary: string; open: boolean; hasError: boolean; tag?: { text: string; done: boolean }; onToggle: () => void; children: React.ReactNode }) {
   return (
     <section className={`group ${props.open ? 'open' : ''}`} data-g={props.id}>
       <button type="button" className="ghead" aria-expanded={props.open} aria-controls={`g-${props.id}`} onClick={props.onToggle}>
@@ -43,6 +49,7 @@ function Group(props: { id: string; n: number; title: string; summary: string; o
           <span className="gtitle">
             {props.title}
             {props.hasError ? <span className="gerr">Needs a fix</span> : null}
+            {props.tag ? <span className={props.tag.done ? 'gtag done' : 'gtag'}>{props.tag.text}</span> : null}
           </span>
           <span className="gsum">{props.summary}</span>
         </span>
@@ -60,7 +67,7 @@ function Group(props: { id: string; n: number; title: string; summary: string; o
 const asInt = (t: string): number | null => (/^\d+$/.test(t.trim()) ? Number(t) : null);
 
 /** One-line digest of each group, built leniently because a field may be half typed. */
-function summaries(p: Profile): Record<string, string> {
+function summaries(p: Profile, eurToInr: number): Record<string, string> {
   const eur = (t: string) => parseMoney(t, 'eur');
   const inr = (t: string) => parseMoney(t, 'inr');
   const kids = p.children.length;
@@ -77,7 +84,6 @@ function summaries(p: Profile): Record<string, string> {
   const goldTotal = (pure(p.goldGrams) + (pure(p.jewelleryGrams) * Number(p.jewelleryPurity)) / 24) * price;
   const nlCount = p.properties.filter((r) => r.country === 'nl').length;
   const inCount = p.properties.filter((r) => r.country === 'in').length;
-  const loanCount = p.properties.filter((r) => r.hasLoan).length;
   return {
     you: p.age.trim() === '' && p.retireAge.trim() === '' ? 'Not filled in yet' : `Age ${asInt(p.age) ?? '?'}, stop at ${asInt(p.retireAge) ?? '?'} \u00B7 ${p.partner ? 'with a partner' : 'alone'}${kids ? `, ${kids} child${kids > 1 ? 'ren' : ''}` : ''}`,
     income: p.salary.trim() === '' ? 'Not filled in yet' : `${sal === null ? '?' : formatEur(sal)} salary${p.hasRuling ? ` \u00B7 30% ruling, ${asInt(p.rulingYears) ?? '?'} yr` : ''}${p.partner && p.partnerEarns ? ` \u00B7 partner ${eur(p.pSalary) === null ? '?' : formatEur(eur(p.pSalary) as number)}` : ''}`,
@@ -86,7 +92,14 @@ function summaries(p: Profile): Record<string, string> {
     property:
       p.properties.length === 0
         ? 'None added: add each property you own'
-        : `${[nlCount ? `${nlCount} in the Netherlands` : '', inCount ? `${inCount} in India` : ''].filter(Boolean).join(', ')} \u00B7 ${loanCount ? `${loanCount} with a mortgage` : 'no mortgage'}`,
+        : (() => {
+            const ms = mortgageSummary(p, eurToInr);
+            const n = p.properties.length;
+            const where = [nlCount ? `${nlCount} in the Netherlands` : '', inCount ? `${inCount} in India` : ''].filter(Boolean).join(', ');
+            if (ms.count === 0) return `${n} ${n === 1 ? 'property' : 'properties'} (${where}) \u00B7 no mortgage`;
+            const end = ms.lastEndAge === null ? '' : ms.count === 1 ? ` \u00B7 ends at age ${ms.lastEndAge}` : ` \u00B7 the last one ends at age ${ms.lastEndAge}`;
+            return `${n} ${n === 1 ? 'property' : 'properties'} \u00B7 ${ms.count} ${ms.count === 1 ? 'mortgage' : 'mortgages'} \u00B7 about ${formatEur(ms.monthlyEur)} a month${end}`;
+          })(),
     pensions: p.pensions.length === 0 ? 'Only the state pension (AOW) so far' : `${p.pensions.length} line${p.pensions.length > 1 ? 's' : ''} added, on top of AOW`,
     assumptions: Object.values(p.assumptions).filter((v) => v.trim() !== '').length === 0 ? 'Using the standard assumptions' : `${Object.values(p.assumptions).filter((v) => v.trim() !== '').length} changed by you`,
     retire: p.destination === 'nl' ? 'Netherlands' : p.destination === 'in' ? 'India' : `Both: ${asInt(p.monthsInIndia) ?? '?'} months a year in India`,
@@ -165,6 +178,8 @@ function PropertyCard(props: {
   onRemove: () => void;
 }) {
   const { row, index, errors: e, age, retire, onChange, onRemove } = props;
+  // A Dutch home you keep can carry a mortgage without a value or a balance: the quick questions only ask for the payment.
+  const homeKept = row.country === 'nl' && row.use === 'home' && !row.sell;
   const inIndia = row.country === 'in';
   const cur: Currency = inIndia ? 'inr' : 'eur';
   const sym = inIndia ? '\u20B9' : '\u20AC';
@@ -190,6 +205,7 @@ function PropertyCard(props: {
       <div className="phead">
         <h3>
           Property {index + 1} <span className="tag">{inIndia ? 'India' : 'Netherlands'}</span>
+          {row.country === 'nl' && row.use === 'home' && row.hasLoan ? <span className="tag quick">Shared with your quick answers</span> : null}
         </h3>
         <button type="button" className="linkbtn" onClick={onRemove} aria-label={`Remove property ${index + 1}`}>
           Remove
@@ -220,7 +236,7 @@ function PropertyCard(props: {
       {e.use ? <div className="err">{e.use}</div> : null}
 
       <div className="two">
-        <Field id={id('value')} label={`Worth today (${sym})`} value={row.value} onChange={(v) => onChange({ value: v })} error={e.value} hint={value !== null && !e.value ? `= ${fmt(value)}` : inIndia ? 'Try "1.2 crore".' : undefined} />
+        <Field id={id('value')} label={`Worth today (${sym})`} value={row.value} onChange={(v) => onChange({ value: v })} error={e.value} hint={value !== null && !e.value ? `= ${fmt(value)}` : inIndia ? 'Try "1.2 crore".' : homeKept && row.hasLoan ? 'Optional while you keep it. Needed if you sell.' : undefined} />
         {use === 'rented' ? (
           <Field id={id('rent')} label={`Rent a month, after tax (${sym})`} value={row.rent} onChange={(v) => onChange({ rent: v })} error={e.rent} />
         ) : (
@@ -238,7 +254,7 @@ function PropertyCard(props: {
             <Field id={id('pay')} label={`Monthly ${inIndia ? 'instalment' : 'payment'} (${sym})`} value={row.loanPayment} onChange={(v) => onChange({ loanPayment: v })} error={e.loanPayment} hint={pay !== null && !e.loanPayment ? `= ${fmt(pay)} a month` : undefined} />
             <Field id={id('yrs')} label="Years left" value={row.loanYears} onChange={(v) => onChange({ loanYears: v })} error={e.loanYears} inputMode="numeric" />
           </div>
-          <Field id={id('bal')} label={`Still owed (${sym})`} value={row.loanBalance} onChange={(v) => onChange({ loanBalance: v })} error={e.loanBalance} hint={bal !== null && !e.loanBalance ? `= ${fmt(bal)}. Used to repay the loan if you sell this property.` : 'Used to repay the loan if you sell this property.'} />
+          <Field id={id('bal')} label={`Still owed (${sym})`} value={row.loanBalance} onChange={(v) => onChange({ loanBalance: v })} error={e.loanBalance} hint={bal === null && homeKept ? 'Not needed unless you sell.' : bal !== null && !e.loanBalance ? `= ${fmt(bal)}. Used to repay the loan if you sell this property.` : 'Used to repay the loan if you sell this property.'} />
           {loanNote ? <div className="note">{loanNote}</div> : null}
         </>
       ) : null}
@@ -369,7 +385,7 @@ function PensionCard(props: {
   );
 }
 
-export default function QuickStart({ profile, errors, propertyErrors, pensionErrors, assumptionErrors, eurToInr, rateIsLive, onChange, onClearMine, open, onToggle, onSetAll, dirty, hasResults, running, onRun }: Props) {
+export default function QuickStart({ profile, errors, propertyErrors, pensionErrors, assumptionErrors, eurToInr, rateIsLive, onChange, liveErrors, onQuickChange, onOpenGroup, onClearMine, open, onToggle, onSetAll, dirty, hasResults, running, onRun }: Props) {
   const set = <K extends keyof Profile>(key: K, value: Profile[K]) => onChange({ ...profile, [key]: value });
 
   const age = /^\d+$/.test(profile.age.trim()) ? Number(profile.age) : null;
@@ -380,9 +396,10 @@ export default function QuickStart({ profile, errors, propertyErrors, pensionErr
   const jewelleryValue = jewRaw ? (Number(jewRaw[1]) * Number(profile.jewelleryPurity) / 24) * goldPriceNum : 0;
   const bullionRaw = /^(\d*\.?\d+)/.exec(profile.goldGrams.trim());
   const goldValue = jewelleryValue + (bullionRaw ? Number(bullionRaw[1]) * goldPriceNum : 0);
-  const sum = summaries(profile);
+  const sum = summaries(profile, eurToInr);
   const errorIds = new Set(Object.keys(errors).map((k) => groupOfField(k)));
-  const grp = (id: string) => ({ id, n: GROUPS.findIndex((g) => g.id === id) + 1, title: GROUPS.find((g) => g.id === id)?.title ?? id, summary: sum[id] ?? '', open: !!open[id], hasError: errorIds.has(id), onToggle: () => onToggle(id) });
+  const boost = boosters(profile);
+  const grp = (id: string) => ({ tag: ((b) => (b ? { text: b.done ? 'Done' : b.gain, done: b.done } : undefined))(boost.find((x) => x.id === id)), id, n: GROUPS.findIndex((g) => g.id === id) + 1, title: GROUPS.find((g) => g.id === id)?.title ?? id, summary: sum[id] ?? '', open: !!open[id], hasError: errorIds.has(id), onToggle: () => onToggle(id) });
   const yearlyExtrasTotal = profile.expenses.reduce((sum, r) => sum + (parseMoney(r.amount, 'eur') ?? 0), 0);
   const inrParts = [profile.inDeposits, profile.inFunds, profile.inEpf].map((t) => (t.trim() === '' ? 0 : parseMoney(t, 'inr')));
   const inrTotal = inrParts.every((x) => x !== null) ? (inrParts as number[]).reduce((a, b) => a + b, 0) : null;
@@ -390,8 +407,11 @@ export default function QuickStart({ profile, errors, propertyErrors, pensionErr
   return (
     <aside className="panel" aria-label="Your details">
 
-      <h2 className="panelTitle">Your details</h2>
-      <p className="muted">Open a group, change your answers, then press Run simulation.</p>
+      <QuickQuestions profile={profile} errors={liveErrors} eurToInr={eurToInr} onChange={onQuickChange} onOpenGroup={onOpenGroup} />
+      <AccuracyPanel profile={profile} onOpenGroup={onOpenGroup} />
+
+      <h2 className="panelTitle">Make it more accurate</h2>
+      <p className="muted">Every group is optional. Open one, change your answers, then press Run simulation. Some answers repeat the quick questions above: they are the same answers.</p>
       <div className="gtools">
         <button type="button" className="linkbtn" onClick={() => onSetAll(true)}>Open all</button>
         <button type="button" className="linkbtn" onClick={() => onSetAll(false)}>Close all</button>
@@ -594,7 +614,7 @@ export default function QuickStart({ profile, errors, propertyErrors, pensionErr
       <Group {...grp('spending')}>
       <section className="qcard">
         <h3>Monthly spending</h3>
-        <Field id="living" label="Living costs, without mortgage payments" value={profile.living} onChange={(v) => set('living', v)} error={errors.living} hint="Everyday costs only. Put holidays and other big yearly costs under Yearly extras, so they are not counted twice." />
+        <Field id="living" label="Living costs: include rent if you rent, leave out your mortgage" value={profile.living} onChange={(v) => set('living', v)} error={errors.living} hint="Everyday costs only. Put holidays and other big yearly costs under Yearly extras, so they are not counted twice." />
         <Chips
           currency="eur"
           current={profile.living}
@@ -730,7 +750,7 @@ export default function QuickStart({ profile, errors, propertyErrors, pensionErr
         <section className="qcard">
           <h3>Your properties</h3>
           <p className="muted">
-            Add each property you own, in the Netherlands or in India. A mortgage belongs to one property, so you tick it on that property. Properties you do not add are left out of your plan.
+            Add each property you own, in the Netherlands or in India. A mortgage belongs to one property, so you tick it on that property. Properties you do not add are left out of your plan. You can have only one home you live in. Other properties in the Netherlands are marked "rented out" or "empty". Mortgages never go into what you spend. For a rented-out or empty property, "still owed" counts against you in Box 3, so fill it in.
           </p>
           {errors.properties ? <div className="err">{errors.properties}</div> : null}
         </section>

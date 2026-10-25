@@ -466,7 +466,7 @@ export function runPlan(input: PlanInput, opts: RunOptions = {}): PlanResult {
         monthlyTodayEur: (ctx.aowFullAnnualToday * ctx.aowAccrualShare) / 12,
       },
     },
-    monteCarlo: { successProbability: mc.successProbability, bands: mc.bands, p10DepletionAge: mc.p10DepletionAge },
+    monteCarlo: { successProbability: mc.successProbability, bands: mc.bands, p10DepletionAge: mc.p10DepletionAge, medianFailAge: mc.medianFailAge },
     verdict: verdictFor(mc.successProbability),
     warnings: collectWarnings(input, a, expected.rows[0]),
   };

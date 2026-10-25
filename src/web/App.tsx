@@ -9,11 +9,15 @@ import Recommend from './RecommendSlide';
 import { applyChange, type Change } from './recommend';
 import {
   clearSavedProfile,
-  EMPTY_PROFILE,
+  STARTER_PROFILE,
   formatEur,
   formatEurFull,
   loadProfile,
+  mortgageFreeSentence,
+  mortgageSummary,
+  parseMoney,
   parseProfile,
+  savingsAnswered,
   saveProfile,
   withDestination,
   type Profile,
@@ -25,6 +29,7 @@ const VERDICT = {
   at_risk: { label: 'At risk', className: 'bad' },
 } as const;
 
+export const FEEDBACK_URL = 'https://forms.gle/JYd64pJHYjTB7wPt8';
 const FALLBACK_RATE = 90;
 const YEAR = new Date().getFullYear();
 const sameProfile = (a: Profile, b: Profile) => JSON.stringify(a) === JSON.stringify(b);
@@ -40,6 +45,8 @@ export default function App() {
   // Do not shout about empty boxes before the person has tried to run anything.
   const [showErrors, setShowErrors] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
+  // True after an edit on the quick questions: those update the answer by themselves, a moment after you stop typing.
+  const [auto, setAuto] = useState(false);
 
   // Fetch today's euro-to-rupee rate once when the page opens. If it fails, keep the fallback.
   useEffect(() => {
@@ -71,6 +78,22 @@ export default function App() {
   const pensionErrors = draftParsed.ok || !showErrors ? {} : draftParsed.pensionErrors;
   const assumptionErrors = draftParsed.ok || !showErrors ? {} : draftParsed.assumptionErrors;
   const dirty = !sameProfile(draft, applied);
+  const liveErrors = draftParsed.ok ? {} : draftParsed.errors;
+
+  useEffect(() => {
+    if (!auto) return;
+    if (!draftParsed.ok) return; // wait until the answers are complete and valid
+    const t = window.setTimeout(() => {
+      setApplied(draft);
+      setAuto(false);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [auto, draft, draftParsed]);
+
+  const openGroup = (id: string) => {
+    setOpen((o) => ({ ...o, [id]: true }));
+    window.setTimeout(() => document.querySelector(`.panel [data-g="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
 
   const run = () => {
     if (!draftParsed.ok) {
@@ -82,10 +105,15 @@ export default function App() {
         if (g) bad[g] = true;
       }
       setOpen((o) => ({ ...o, ...bad }));
-      setNotice('A few answers are missing or need a fix before the simulation can run. The groups to check are open.');
+      const onlySavings = Object.keys(draftParsed.errors).every((k) => k === 'savingsQuick');
+      setNotice(
+        onlySavings
+          ? 'Tell us what you have saved (question 5), then your answer appears. Enter 0 if you have nothing.'
+          : 'A few answers are missing or need a fix before the simulation can run. The groups to check are open.',
+      );
       // Once the groups have opened and the errors have drawn, take the person to the first field that needs a fix.
       window.setTimeout(() => {
-        const first = document.querySelector<HTMLElement>('.panel [aria-invalid="true"]');
+        const first = document.querySelector<HTMLElement>('.panel [aria-invalid="true"]') ?? (draftParsed.errors.savingsQuick ? document.querySelector<HTMLElement>('#qq-savings') : null);
         if (!first) return;
         first.scrollIntoView({ behavior: 'smooth', block: 'center' });
         first.focus({ preventScroll: true });
@@ -132,10 +160,11 @@ export default function App() {
       <header className="top">
         <strong>NRI FinWealth</strong>
         <span className="beta" title="Beta: we are still checking the tax figures with advisers">Beta</span>
+        <a className="topFeedback" href={FEEDBACK_URL} target="_blank" rel="noreferrer">Give feedback</a>
       </header>
 
       <h1>Where could you retire comfortably: the Netherlands, India, or both?</h1>
-      <p className="sub">Free, personalised and calculated on your own device. Built for NRIs living in the Netherlands. Belgium, Luxembourg, Germany, Austria, Switzerland, France and the UK are next.</p>
+      <p className="sub">Free, personalised and calculated on your own device. Built for NRIs living in the Netherlands.</p>
 
       <div className="privacy" role="note">
         <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -158,10 +187,18 @@ export default function App() {
           eurToInr={rate.value}
           rateIsLive={rate.live}
           onChange={setDraft}
+          liveErrors={liveErrors}
+          onQuickChange={(next) => {
+            setDraft(next);
+            setAuto(true);
+          }}
+          onOpenGroup={openGroup}
           onClearMine={() => {
             clearSavedProfile();
-            setDraft(EMPTY_PROFILE);
-            setApplied(EMPTY_PROFILE);
+            lastView.current = null;
+            setDraft(STARTER_PROFILE);
+            setApplied(STARTER_PROFILE);
+            setAuto(false);
             setShowErrors(false);
             setNotice(null);
           }}
@@ -174,9 +211,9 @@ export default function App() {
           onRun={run}
         />
 
-        <div className={`results ${dirty ? 'dim' : ''}`} ref={resultsRef}>
+        <div className={`results ${dirty && !(auto && draftParsed.ok) ? 'dim' : ''}`} ref={resultsRef}>
           {notice ? <div className="card alert" role="alert">{notice}</div> : null}
-          {dirty ? (
+          {dirty && !(auto && draftParsed.ok) ? (
             <div className="stale" role="status">
               <span>You changed your answers. The results here are from your last run.</span>
               <button type="button" className="run" disabled={running} onClick={run}>
@@ -187,22 +224,49 @@ export default function App() {
           {shown ? (
             <Results view={shown} destination={shown.destination} setDestination={(d) => applyNow((p) => withDestination(p, d))} nudge={nudgeRetireAge} profile={applied} eurToInr={rate.value} startYear={YEAR} onApply={applyRecommendation} onUndo={undoRecommendation} canUndo={undo !== null} />
           ) : (
-            <div className="card empty">
-              <h2>Your results will appear here</h2>
-              <p>Open a group in the form, fill in what you know, and press <strong>Run simulation</strong>. Only age, the age you want to stop working, years in the Netherlands, salary and monthly spending are required. Leave anything else blank if it does not apply.</p>
-            </div>
+            !savingsAnswered(draft) ? (
+              <div className="card gate" role="status">
+                <h2>One more answer needed</h2>
+                <p>Tell us what you have saved, and your answer appears here.</p>
+              </div>
+            ) : (
+              <div className="card empty">
+                <h2>Your results will appear here</h2>
+                <p>Check the answers marked in red on the left. Once the 7 quick questions are complete, your answer appears by itself. Answers in the groups below the questions need <strong>Run simulation</strong>.</p>
+              </div>
+            )
           )}
         </div>
       </div>
 
+      {shown ? (
+        <div className="liveBar" role="region" aria-label="Your answer so far">
+          <div className="liveText">
+            <span className={`badge ${VERDICT[shown.plan.verdict].className}`}>Verdict: {VERDICT[shown.plan.verdict].label}</span>
+            <strong>
+              If you live to {shown.age + shown.plan.meta.horizonYears}, your money lasts in {Math.round(shown.plan.monteCarlo.successProbability * 100)} of 100 possible future scenarios
+            </strong>
+          </div>
+          <button type="button" className="run" onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+            See details
+          </button>
+        </div>
+      ) : null}
+
       <footer>
         Planning estimate, not advice. Tax rules as of {shown?.plan.meta.rulesAsOf ?? '2026-10-22'}. Engine v{shown?.plan.meta.engineVersion ?? '2.1.0'} &middot; {shown?.plan.meta.paths ?? 400} simulated futures.
+        <div className="contact">
+          <a href={FEEDBACK_URL} target="_blank" rel="noreferrer">Give feedback</a> &middot; <a href="mailto:hello@nrifinwealth.com">hello@nrifinwealth.com</a>
+          <br />
+          Living elsewhere in Europe? <a href={FEEDBACK_URL} target="_blank" rel="noreferrer">Tell us which country you would like next</a>.
+        </div>
         <details className="about">
           <summary>Privacy and disclaimer</summary>
           <p><strong>Your numbers stay with you.</strong> All calculations run in your browser. Nothing you type is sent to a server, and the tool has no account and no tracking of its own. Your answers are saved only in this browser (local storage); clear your site data to remove them. The only outside call fetches the public euro-to-rupee rate; it carries none of your data. Our hosting provider, Cloudflare, keeps standard anonymous traffic counts, as any website host does.</p>
           <p><strong>Beta.</strong> This tool is still being tested and its tax figures are still being checked by advisers. Expect mistakes, and tell us when you find one.</p>
           <p><strong>Not financial, tax or legal advice.</strong> This is an educational planning tool. It shows what could happen under stated assumptions and gives general what-if scenarios. It does not know your full situation, and it does not recommend any bank, investment product or insurance. Tax rules change (for example the Dutch Box 3 reform), some figures are proposals, and Indian tax and healthcare costs are only partly modelled. Past or simulated results do not predict the future. Check the result with a licensed adviser before you act on it. We accept no liability for decisions made using this tool.</p>
-          <p>nrifinwealth.com is open source under the AGPL-3.0 licence. <a href="https://github.com/sankarraman1307-web/nri-finwealth" target="_blank" rel="noreferrer">Source code</a>. Spotted a wrong rule or number? Please report it there.</p>
+          <p><strong>Feedback.</strong> Your numbers never leave this device. If you choose to send feedback, what you write goes to our form provider (Google Forms), so please do not include exact salary, savings or other personal figures.</p>
+          <p>nrifinwealth.com is open source under the AGPL-3.0 licence. <a href="https://github.com/sankarraman1307-web/nri-finwealth" target="_blank" rel="noreferrer">Source code</a>. Spotted a wrong rule or number? Please report it there. Questions or feedback: <a href="mailto:hello@nrifinwealth.com">hello@nrifinwealth.com</a>.</p>
         </details>
       </footer>
     </main>
@@ -258,6 +322,9 @@ function Results(props: {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const pct = Math.round(plan.monteCarlo.successProbability * 100);
+  const failRest = 100 - pct;
+  const spendNow = parseMoney(profile.living, 'eur') ?? 0;
+  const mort = useMemo(() => mortgageSummary(profile, eurToInr), [profile, eurToInr]);
   const verdict = VERDICT[plan.verdict];
   const horizonAge = age + plan.meta.horizonYears;
   const gap = plan.expected.margin * (basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1);
@@ -283,15 +350,37 @@ function Results(props: {
       attention: pct < 90,
       content: (
         <>
-      <section className="card hero">
-        <div className={`big ${verdict.className}`}>{pct}%</div>
-        <div>
-          <span className={`badge ${verdict.className}`}>{verdict.label}</span>
-          <h2>
-            In {pct} of 100 simulated futures, your money lasts to {horizonAge}.
-          </h2>
-          <p>
-            Retiring at {retireAge} the plan projects {formatEur(plan.expected.corpusAtRetirement * toBasis)} ({unit})
+      <section className="card hero verdictCard">
+        <span className={`badge ${verdict.className}`}>Verdict: {verdict.label}</span>
+        <h2>If you live to {horizonAge}, your money lasts in {pct} of 100 possible future scenarios.</h2>
+        <div className="meter" role="img" aria-label={`${pct} out of 100. Aim for 90 or more.`}>
+          <div className="meterBar">
+            <div className={`meterFill ${verdict.className}`} style={{ width: `${pct}%` }} />
+            <span className="meterMark" style={{ left: '90%' }} />
+          </div>
+          <div className="meterScale" aria-hidden="true">
+            <span>0</span>
+            <span className="aim">Aim for 90 or more</span>
+            <span>100</span>
+          </div>
+        </div>
+        <p className="lead">
+          Retiring at {retireAge}, living on about {formatEurFull(spendNow)} a month in today&rsquo;s money
+          {mort.count > 0 && mort.monthlyEur > 0 && mort.lastEndAge !== null
+            ? mort.count === 1
+              ? `, plus your ${formatEurFull(mort.monthlyEur)} mortgage until age ${mort.lastEndAge}`
+              : `, plus about ${formatEurFull(mort.monthlyEur)} a month in mortgages, the last until age ${mort.lastEndAge}`
+            : ''}
+          .
+        </p>
+        {failRest >= 3 && plan.monteCarlo.medianFailAge !== null && plan.monteCarlo.medianFailAge !== undefined ? (
+          <p className="lead">In the other {failRest} scenarios, your money runs out around age {plan.monteCarlo.medianFailAge} on average.</p>
+        ) : null}
+        <p className="muted small">
+          We replay 100 different versions of the future, with good and bad markets and different inflation. We plan until age {horizonAge} so you are covered if you live long. You can change that age under Assumptions.
+        </p>
+        <p className="detailLine">
+            On the day you stop, at {retireAge}, the plan projects {formatEur(plan.expected.corpusAtRetirement * toBasis)} ({unit})
             {soldAtStop > 1000 ? `, including ${formatEur(soldAtStop)} from selling property that year` : ''}.{' '}
             {noSavingsNeeded
               ? `You would not need savings on the day you stop: your pensions, rent and later property sales already pay for your spending to ${horizonAge}, if returns are exactly average. The Savings over time slide uses a more cautious test.`
@@ -300,8 +389,8 @@ function Results(props: {
             {earliest !== null && earliest > retireAge ? ` On average returns, the earliest age that fully works is ${earliest}.` : ''}
             {earliest === null ? ' On average returns, no retirement age up to 75 fully works.' : ''}
           </p>
-        </div>
       </section>
+      {mort.loans.length > 0 ? <MortgageTimeline loans={mort.loans} age={age} retireAge={retireAge} lastEnd={mort.lastEndAge} /> : null}
 
           {topWarning ? (
             <div className="card alert" role="note">
@@ -478,8 +567,9 @@ function Results(props: {
     <>
       <div className="strip" role="region" aria-label="Your result at a glance">
         <div className="stripMain">
-          <span className={`stripPct ${verdict.className}`}>{pct}%</span>
-          <span className={`badge ${verdict.className}`}>{verdict.label}</span>
+          <span className={`stripPct ${verdict.className}`}>{pct}</span>
+          <span className="stripOf">of 100 scenarios work</span>
+          <span className={`badge ${verdict.className}`}>Verdict: {verdict.label}</span>
           <div className="stripAge" role="group" aria-label="Retire at age">
             <span className="lbl">Retire at</span>
             <button type="button" onClick={() => nudge(-1)} aria-label="Retire one year earlier">
@@ -528,6 +618,10 @@ function Results(props: {
         ) : null,
       )}
 
+      <p className="feedbackPrompt">
+        Did this match what you expected? <a href={FEEDBACK_URL} target="_blank" rel="noreferrer">Tell us what is off</a>.
+      </p>
+
       {all ? null : (
         <div className="pager">
           <button type="button" disabled={slide === 0} onClick={() => go(slide - 1)}>
@@ -542,5 +636,39 @@ function Results(props: {
         </div>
       )}
     </>
+  );
+}
+
+/** Each loan as a bar from today to its end. Teal is paid while you still work, amber after you stop. */
+function MortgageTimeline(props: { loans: { id: string; label: string; endAge: number }[]; age: number; retireAge: number; lastEnd: number | null }) {
+  const { loans, age, retireAge, lastEnd } = props;
+  if (lastEnd === null) return null;
+  const to = Math.max(lastEnd, retireAge) + 2;
+  const span = Math.max(1, to - age);
+  const pctOf = (a: number) => Math.min(100, Math.max(0, ((a - age) / span) * 100));
+  const rows = [...loans].sort((a, b) => a.endAge - b.endAge);
+  return (
+    <section className="card mortgageTl" aria-label="When your mortgages end">
+      <h3>{mortgageFreeSentence(lastEnd, retireAge)}</h3>
+      <div className="tlWrap">
+        <span className="tlStop" style={{ left: `${pctOf(retireAge)}%` }}>Stop work at {retireAge}</span>
+        {rows.map((l) => {
+          const work = Math.max(0, pctOf(Math.min(l.endAge, retireAge)));
+          const after = Math.max(0, pctOf(l.endAge) - pctOf(Math.max(retireAge, age)));
+          return (
+            <div className="tlRow" key={l.id}>
+              <span className="tlName">{l.label}</span>
+              <span className="tlTrack">
+                <span className="tlWork" style={{ width: `${work}%` }} />
+                <span className="tlAfter" style={{ width: `${l.endAge > retireAge ? after : 0}%` }} />
+                <span className="tlEnd" style={{ left: `${pctOf(l.endAge)}%` }}>age {l.endAge}</span>
+              </span>
+            </div>
+          );
+        })}
+        <div className="tlAxis"><span>Age {age}</span><span>{to}</span></div>
+      </div>
+      <div className="tlLegend"><span><i className="tlWork" />Paid while you work</span><span><i className="tlAfter" />Still paid after you stop</span></div>
+    </section>
   );
 }

@@ -129,6 +129,8 @@ export interface Profile {
   living: string;
   nlCash: string;
   nlInvestments: string;
+  /** The one-number answer from the quick questions: savings and investments in the Netherlands. Used only while cash and investments below are both blank. */
+  savingsQuick: string;
   hasRuling: boolean;
   /** Whole years the 30% ruling still runs, counting this year. */
   rulingYears: string;
@@ -193,6 +195,7 @@ export const SAMPLE_PROFILE: Profile = {
   living: '5000',
   nlCash: '25000',
   nlInvestments: '190000',
+  savingsQuick: '',
   hasRuling: true,
   rulingYears: '3',
   rulingBefore2024: false,
@@ -246,6 +249,7 @@ export const EMPTY_PROFILE: Profile = {
   living: '',
   nlCash: '',
   nlInvestments: '',
+  savingsQuick: '',
   hasRuling: false,
   rulingYears: '',
   rulingBefore2024: false,
@@ -395,6 +399,13 @@ export type ParseResult =
       assumptionErrors: Record<string, string>;
     };
 
+/** When only one savings number is given, this share is treated as cash and the rest as investments. A stated assumption, shown to the user. */
+export const QUICK_SAVINGS_CASH_SHARE = 0.3;
+
+/** True once any savings answer has been given: the quick total, Dutch cash or investments, Indian savings, or gold. */
+export const savingsAnswered = (p: Profile): boolean =>
+  [p.savingsQuick, p.nlCash, p.nlInvestments, p.inDeposits, p.inFunds, p.inEpf, p.goldGrams, p.jewelleryGrams].some((t) => t.trim() !== '');
+
 const wholeNumber = (text: string): number | null => {
   const t = text.trim();
   return /^\d+$/.test(t) ? Number(t) : null;
@@ -430,8 +441,18 @@ export function parseProfile(p: Profile): ParseResult {
     }
     return n;
   };
-  const nlCash = eurField(p.nlCash, 'nlCash');
-  const nlInvestments = eurField(p.nlInvestments, 'nlInvestments');
+  let nlCash = eurField(p.nlCash, 'nlCash');
+  let nlInvestments = eurField(p.nlInvestments, 'nlInvestments');
+  // The quick answer is one number. It only applies while the detailed boxes are empty, and is split by a stated assumption.
+  const quickText = p.savingsQuick.trim();
+  if (quickText !== '' && p.nlCash.trim() === '' && p.nlInvestments.trim() === '') {
+    const q = parseMoney(quickText, 'eur');
+    if (q === null || q < 0) errors.savingsQuick = 'Enter an amount, for example 150000 or 150k. Use 0 if you have none.';
+    else {
+      nlCash = q * QUICK_SAVINGS_CASH_SHARE;
+      nlInvestments = q - nlCash;
+    }
+  }
 
   const inrField = (text: string, key: 'inDeposits' | 'inFunds' | 'inEpf'): number => {
     if (text.trim() === '') return 0;
@@ -445,6 +466,9 @@ export function parseProfile(p: Profile): ParseResult {
   const inDeposits = inrField(p.inDeposits, 'inDeposits');
   const inFunds = inrField(p.inFunds, 'inFunds');
   const inEpf = inrField(p.inEpf, 'inEpf');
+
+  // Savings must be answered, even if the answer is 0, so a blank form never looks like "you have nothing saved".
+  if (!savingsAnswered(p) && !errors.savingsQuick) errors.savingsQuick = 'Tell us what you have saved. Enter 0 if you have nothing.';
 
   let rulingYears = 0;
   if (p.hasRuling) {
@@ -557,7 +581,9 @@ export function parseProfile(p: Profile): ParseResult {
       }
       return n;
     };
-    const value = money(row.value, 'value', inIndia ? 'Enter what it is worth, for example "1.2 crore".' : 'Enter what it is worth, for example 650000.');
+    // A Dutch home you keep can carry a mortgage payment without a value or a balance (the quick questions only ask for the payment).
+    const homeKept = !inIndia && row.use === 'home' && row.hasLoan && !row.sell;
+    const value = homeKept && row.value.trim() === '' ? 0 : money(row.value, 'value', inIndia ? 'Enter what it is worth, for example "1.2 crore".' : 'Enter what it is worth, for example 650000.');
     const prop: Property = { id: row.id, country: row.country, use: inIndia && row.use === 'home' ? 'empty' : row.use, value: value ?? 0 };
     if (!inIndia && prop.use === 'home') {
       homes += 1;
@@ -568,7 +594,7 @@ export function parseProfile(p: Profile): ParseResult {
       if (rent !== null) prop.rentMonthly = rent;
     }
     if (row.hasLoan) {
-      const bal = money(row.loanBalance, 'loanBalance', 'Enter what you still owe.');
+      const bal = homeKept && row.loanBalance.trim() === '' ? 0 : money(row.loanBalance, 'loanBalance', 'Enter what you still owe.', homeKept);
       const pay = money(row.loanPayment, 'loanPayment', inIndia ? 'Enter the monthly instalment, for example 45,000.' : 'Enter the monthly payment, for example 1600.');
       const yrs = wholeNumber(row.loanYears);
       if (yrs === null || yrs < 1 || yrs > 40) e.loanYears = 'Enter 1 to 40 years.';
@@ -855,12 +881,14 @@ export function toPlanInput(v: Parsed, eurToInr: number, startYear: number): Pla
   };
 }
 
-/** Picks where you retire. Choosing "Both" for the first time suggests 4 months in India, which you can change. */
+/** Choosing "Both" for the first time suggests an even split, 6 months in India, which you can change. */
+export const DEFAULT_MONTHS_IN_INDIA = 6;
+
 /** India living costs as a share of Dutch costs, by where you live there. Unanswered = the standard blend. */
 export const INDIA_HOME_FACTOR = { own: 0.32, family: 0.3, rent: 0.45 } as const;
 
 export function withDestination(p: Profile, destination: Destination): Profile {
-  const months = destination === 'both' && p.monthsInIndia.trim() === '' ? '4' : p.monthsInIndia;
+  const months = destination === 'both' && p.monthsInIndia.trim() === '' ? String(DEFAULT_MONTHS_IN_INDIA) : p.monthsInIndia;
   return { ...p, destination, monthsInIndia: months };
 }
 
@@ -873,12 +901,12 @@ const STORAGE_KEY = 'nri-finwealth-profile-v9';
 export function loadProfile(): Profile {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY_PROFILE;
+    if (!raw) return STARTER_PROFILE;
     const p = JSON.parse(raw) as Partial<Profile>;
     const merged = { ...EMPTY_PROFILE, ...p };
-    return Array.isArray(merged.children) && Array.isArray(merged.expenses) && Array.isArray(merged.properties) && Array.isArray(merged.pensions) ? merged : EMPTY_PROFILE;
+    return Array.isArray(merged.children) && Array.isArray(merged.expenses) && Array.isArray(merged.properties) && Array.isArray(merged.pensions) ? merged : STARTER_PROFILE;
   } catch {
-    return EMPTY_PROFILE;
+    return STARTER_PROFILE;
   }
 }
 
@@ -896,4 +924,105 @@ export function clearSavedProfile(): void {
   } catch {
     /* nothing to clear */
   }
+}
+
+// ---------------------------------------------------------------------------
+// Quick questions: the first screen, and the one mortgage record it shares with the Property group
+// ---------------------------------------------------------------------------
+
+/** What a first-time visitor sees on the quick questions. Savings is left empty on purpose: it is the one answer we need. */
+export const STARTER_PROFILE: Profile = {
+  ...EMPTY_PROFILE,
+  age: '42',
+  retireAge: '58',
+  yearsInNl: '12',
+  salary: '87500',
+  living: '4250',
+};
+
+/** A loan's end age, from the age typed in the form. */
+const wholeOrNull = (t: string): number | null => (/^\d+$/.test(t.trim()) ? Number(t) : null);
+
+/** The Dutch home you live in, if it is in the list. There can be only one. */
+export const dutchHomeRow = (p: Profile): PropertyRow | undefined => p.properties.find((r) => r.country === 'nl' && r.use === 'home');
+
+/**
+ * The quick "I pay a mortgage" box edits ONE record: the loan on the Dutch home. As soon as there is any other loan,
+ * the box turns into a read-only summary, so a loan is never entered twice and never counted twice.
+ */
+export function quickMortgageMode(p: Profile): 'edit' | 'summary' {
+  const loans = p.properties.filter((r) => r.hasLoan);
+  if (loans.length === 0) return 'edit';
+  if (loans.length === 1 && loans[0] === dutchHomeRow(p)) return 'edit';
+  return 'summary';
+}
+
+/** Ticks or unticks the quick mortgage box. Unticking removes a home row that only existed for the loan. */
+export function setQuickMortgage(p: Profile, on: boolean, newId: () => string): Profile {
+  if (quickMortgageMode(p) !== 'edit') return p;
+  const home = dutchHomeRow(p);
+  if (on) {
+    if (home) return { ...p, properties: p.properties.map((r) => (r === home ? { ...r, hasLoan: true } : r)) };
+    return { ...p, properties: [...p.properties, { ...newProperty('nl', newId()), hasLoan: true }] };
+  }
+  if (!home) return p;
+  const onlyForLoan = home.value.trim() === '' && home.rent.trim() === '' && !home.sell;
+  if (onlyForLoan) return { ...p, properties: p.properties.filter((r) => r !== home) };
+  return { ...p, properties: p.properties.map((r) => (r === home ? { ...r, hasLoan: false } : r)) };
+}
+
+/** Edits the payment or the years left of the home loan from the quick box. */
+export function patchQuickMortgage(p: Profile, patch: Partial<Pick<PropertyRow, 'loanPayment' | 'loanYears'>>): Profile {
+  const home = dutchHomeRow(p);
+  if (!home) return p;
+  return { ...p, properties: p.properties.map((r) => (r === home ? { ...r, ...patch } : r)) };
+}
+
+export interface MortgageSummary {
+  /** How many properties carry a loan. */
+  count: number;
+  /** Total of the monthly payments, rupee loans converted at the given rate. */
+  monthlyEur: number;
+  /** The age at which the last loan ends, or null if no loan is complete yet. */
+  lastEndAge: number | null;
+  /** True if a rupee loan was converted. */
+  hasRupeeLoan: boolean;
+  loans: { id: string; label: string; endAge: number; monthlyEur: number }[];
+}
+
+const propertyLabel = (r: PropertyRow, n: number): string => {
+  const place = r.country === 'nl' ? 'Dutch' : 'Indian';
+  const what = r.country === 'nl' && r.use === 'home' ? 'home' : 'property';
+  return n > 1 && what === 'property' ? `${place} property ${n}` : `${place} ${what}`;
+};
+
+/** A lenient digest of every loan in the form, for the quick box, the Property header and the results sentence. */
+export function mortgageSummary(p: Profile, eurToInr: number): MortgageSummary {
+  const age = wholeOrNull(p.age);
+  const loans: MortgageSummary['loans'] = [];
+  let count = 0;
+  let monthlyEur = 0;
+  let hasRupeeLoan = false;
+  p.properties.forEach((r, i) => {
+    if (!r.hasLoan) return;
+    count += 1;
+    const pay = parseMoney(r.loanPayment, r.country === 'in' ? 'inr' : 'eur');
+    const yrs = wholeOrNull(r.loanYears);
+    const eur = pay === null ? 0 : r.country === 'in' ? pay / eurToInr : pay;
+    if (r.country === 'in') hasRupeeLoan = true;
+    monthlyEur += eur;
+    if (age !== null && yrs !== null) loans.push({ id: r.id, label: propertyLabel(r, i + 1), endAge: loanEndAge(age, yrs), monthlyEur: eur });
+  });
+  const lastEndAge = loans.length > 0 ? Math.max(...loans.map((l) => l.endAge)) : null;
+  return { count, monthlyEur, lastEndAge, hasRupeeLoan, loans };
+}
+
+/** "You are mortgage-free at 60, two years after you stop working." */
+export function mortgageFreeSentence(lastEndAge: number, retireAge: number): string {
+  const words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  const n = lastEndAge - retireAge;
+  const num = (k: number) => words[k] ?? String(k);
+  if (n > 0) return `You are mortgage-free at ${lastEndAge}, ${num(n)} ${n === 1 ? 'year' : 'years'} after you stop working.`;
+  if (n === 0) return `You are mortgage-free at ${lastEndAge}, the year you stop working.`;
+  return `You are mortgage-free at ${lastEndAge}, ${num(-n)} ${-n === 1 ? 'year' : 'years'} before you stop working.`;
 }

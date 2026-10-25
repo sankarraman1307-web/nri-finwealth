@@ -23,9 +23,9 @@ describe('computing the whole results view', () => {
     const card = nl.compare.find((c) => c.destination === 'nl')!.successProbability;
     expect(Math.abs(card - nl.plan.monteCarlo.successProbability)).toBeLessThan(0.1);
   });
-  it('the Both card uses the months you typed, or 4 when none', () => {
-    expect(computeView(SAMPLE_PROFILE, 90, 2026)!.compareMonths).toBe(4);
-    expect(computeView({ ...SAMPLE_PROFILE, monthsInIndia: '6' }, 90, 2026)!.compareMonths).toBe(6);
+  it('the Both card uses the months you typed, or 6 (an even split) when none', () => {
+    expect(computeView(SAMPLE_PROFILE, 90, 2026)!.compareMonths).toBe(6);
+    expect(computeView({ ...SAMPLE_PROFILE, monthsInIndia: '4' }, 90, 2026)!.compareMonths).toBe(4);
   });
   it('is repeatable: same answers give the same numbers', () => {
     const a = computeView(SAMPLE_PROFILE, 90, 2026)!;

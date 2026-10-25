@@ -248,10 +248,10 @@ describe('snowbird fields are optional unless you choose Both', () => {
     expect(SAMPLE_PROFILE.travel).toBe('');
     expect(parseProfile(SAMPLE_PROFILE).ok).toBe(true);
   });
-  it('REGRESSION: choosing Both suggests 4 months, which you can then change', () => {
+  it('REGRESSION: choosing Both suggests an even split of 6 months, which you can then change', () => {
     const p = withDestination(SAMPLE_PROFILE, 'both');
     expect(p.destination).toBe('both');
-    expect(p.monthsInIndia).toBe('4');
+    expect(p.monthsInIndia).toBe('6');
     expect(withDestination({ ...p, monthsInIndia: '7' }, 'both').monthsInIndia).toBe('7');
   });
   it('asks for the months if you choose Both and clear the box', () => {
@@ -261,7 +261,7 @@ describe('snowbird fields are optional unless you choose Both', () => {
   });
   it('switching back to the Netherlands keeps your months but does not require them', () => {
     const p = withDestination(withDestination(SAMPLE_PROFILE, 'both'), 'nl');
-    expect(p.monthsInIndia).toBe('4');
+    expect(p.monthsInIndia).toBe('6');
     expect(parseProfile({ ...p, monthsInIndia: '' }).ok).toBe(true);
   });
 });
@@ -271,11 +271,11 @@ describe('the app starts empty, with no sample household', () => {
     const r = parseProfile(EMPTY_PROFILE);
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(Object.keys(r.errors).sort()).toEqual(['age', 'living', 'retireAge', 'salary', 'yearsInNl']);
+      expect(Object.keys(r.errors).sort()).toEqual(['age', 'living', 'retireAge', 'salary', 'savingsQuick', 'yearsInNl']);
     }
   });
   it('works once only the essentials are filled in; everything else is blank and counts as none', () => {
-    const r = parseProfile({ ...EMPTY_PROFILE, age: '40', retireAge: '60', yearsInNl: '5', salary: '90k', living: '3500' });
+    const r = parseProfile({ ...EMPTY_PROFILE, age: '40', retireAge: '60', yearsInNl: '5', salary: '90k', living: '3500', savingsQuick: '0' });
     expect(r.ok).toBe(true);
     if (r.ok) {
       const p = toPlanInput(r.value, 90, 2026);
@@ -337,8 +337,11 @@ describe('gold in the profile', () => {
 
 describe('every mortgage belongs to one property', () => {
   const rowErr = (row: PropertyRow, key: keyof PropertyRow) => propErrors(only(row))[row.id]?.[key];
-  it('a mortgage needs the property to have a value', () => {
-    expect(rowErr(nlRow({ value: '' }), 'value')).toBeDefined();
+  it('a mortgage needs the property to have a value, except on a home you keep (the quick questions only ask for the payment)', () => {
+    expect(rowErr(nlRow({ use: 'rented', rent: '0', value: '' }), 'value')).toBeDefined();
+    expect(rowErr(nlRow({ value: '', sell: true, sellAge: '65', rentAfterSale: '1800' }), 'value')).toBeDefined();
+    expect(rowErr(nlRow({ value: '' }), 'value')).toBeUndefined();
+    expect(rowErr(nlRow({ value: '', loanBalance: '' }), 'loanBalance')).toBeUndefined();
   });
   it('a loan needs a balance, a payment and years', () => {
     const e = propErrors(only(inRow({ hasLoan: true, loanBalance: '', loanPayment: '', loanYears: '' })))['in1'] ?? {};

@@ -12,7 +12,7 @@ import {
   type PlanResult,
 } from '../engine';
 import { bridgeCheck, monthlySeries, planEvents, type Bridge, type MonthlyPoint } from './chartData';
-import { parseProfile, toPlanInput, type Profile } from './profile';
+import { DEFAULT_MONTHS_IN_INDIA, parseProfile, toPlanInput, type Profile } from './profile';
 
 export interface View {
   plan: PlanResult;
@@ -41,7 +41,7 @@ export function computeView(profile: Profile, eurToInr: number, startYear: numbe
   if (!parsed.ok) return null;
   const input = toPlanInput(parsed.value, eurToInr, startYear);
   const a = mergeAssumptions(parsed.value.overrides);
-  const compareMonths = parsed.value.monthsInIndia > 0 ? parsed.value.monthsInIndia : 4;
+  const compareMonths = parsed.value.monthsInIndia > 0 ? parsed.value.monthsInIndia : DEFAULT_MONTHS_IN_INDIA;
   const plan = runPlan(input, { paths: 400, seed: SEED, assumptions: parsed.value.overrides });
   return {
     plan,

@@ -363,6 +363,8 @@ export interface PlanResult {
     bands: BandPoint[];
     /** Age by which 10% of simulated paths have run out of money (null if fewer than 10% do). */
     p10DepletionAge: number | null;
+    /** Typical (median) age the money runs out, among the simulated paths that run out. Null if none do. */
+    medianFailAge: number | null;
   };
   verdict: Verdict;
   warnings: Warning[];
