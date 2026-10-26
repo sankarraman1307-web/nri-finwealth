@@ -222,7 +222,7 @@ export default function App() {
             </div>
           ) : null}
           {shown ? (
-            <Results view={shown} destination={shown.destination} setDestination={(d) => applyNow((p) => withDestination(p, d))} nudge={nudgeRetireAge} profile={applied} eurToInr={rate.value} startYear={YEAR} onApply={applyRecommendation} onUndo={undoRecommendation} canUndo={undo !== null} />
+            <Results view={shown} destination={shown.destination} setDestination={(d) => applyNow((p) => withDestination(p, d))} setLegacy={(l) => applyNow((p) => ({ ...p, legacy: l }))} nudge={nudgeRetireAge} profile={applied} eurToInr={rate.value} startYear={YEAR} onApply={applyRecommendation} onUndo={undoRecommendation} canUndo={undo !== null} />
           ) : (
             !savingsAnswered(draft) ? (
               <div className="card gate" role="status">
@@ -273,13 +273,13 @@ export default function App() {
   );
 }
 
-const RATES = [0.03, 0.035, 0.04, 0.045] as const;
 const pctText = (r: number) => `${(r * 100).toFixed(1).replace(/\.0$/, '')}%`;
 
 function Results(props: {
   view: View;
   destination: Destination;
   setDestination: (d: Destination) => void;
+  setLegacy: (l: 'spend' | 'intact') => void;
   nudge: (delta: number) => void;
   profile: Profile;
   eurToInr: number;
@@ -288,9 +288,8 @@ function Results(props: {
   onUndo: () => void;
   canUndo: boolean;
 }) {
-  const { view, destination, setDestination, nudge, profile, eurToInr, startYear, onApply, onUndo, canUndo } = props;
+  const { view, destination, setDestination, setLegacy, nudge, profile, eurToInr, startYear, onApply, onUndo, canUndo } = props;
   const { plan, ruling, compare, curve, monthly, retireAge, age, aowAge } = view;
-  const [rate, setRate] = useState<number>(0.035);
   const [basis, setBasis] = useState<EuroBasis>('future');
   const [slide, setSlide] = useState<number>(() => {
     const m = /^#s(\d)$/.exec(typeof window === 'undefined' ? '' : window.location.hash);
@@ -321,6 +320,9 @@ function Results(props: {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  const intact = view.legacy === 'intact';
+  // The yearly share of savings you live on. Only used, and only shown, when you keep your savings intact.
+  const rate = view.safeRate;
   const pct = Math.round(plan.monteCarlo.successProbability * 100);
   const failRest = 100 - pct;
   const spendNow = parseMoney(profile.living, 'eur') ?? 0;
@@ -330,13 +332,26 @@ function Results(props: {
   const gap = plan.expected.margin * (basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1);
   const earliest = earliestFeasibleAge(curve);
   const series = useMemo(
-    () => drawdownSeries(plan.monteCarlo.bands, monthly, { rate, inflation: view.inflation, startAge: age, basis }),
-    [plan, monthly, rate, basis, view.inflation, age],
+    () =>
+      drawdownSeries(plan.monteCarlo.bands, monthly, {
+        mode: intact ? 'intact' : 'spend',
+        rate,
+        inflation: view.inflation,
+        startAge: age,
+        basis,
+        retireAge,
+        ...(plan.expected.requiredByAge ? { required: plan.expected.requiredByAge } : {}),
+        curve,
+      }),
+    [plan, monthly, curve, intact, rate, basis, view.inflation, age, retireAge],
   );
   const free = independenceAge(series);
   const unit = basis === 'future' ? 'future euros' : "today's euros";
   // Values the engine gives at the day you stop are in that year's euros. 'today' removes inflation since now.
   const toBasis = basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1;
+  // One definition of "needed", chosen by the question. Spend it all: the smallest pot that lasts to the end. Keep it intact: a fixed share of the pot per year.
+  const neededAtStop = intact ? series.find((p) => p.age === retireAge)?.needed ?? null : plan.expected.requiredCorpus * toBasis;
+  const typicalAtStop = view.typicalAtStop * toBasis;
   const bridge = useMemo(() => bridgeCheck(plan, retireAge, aowAge, view.inflation, basis), [plan, retireAge, aowAge, view.inflation, basis]);
   const topWarning = plan.warnings.find((w) => w.severity === 'important');
   const noSavingsNeeded = plan.expected.requiredCorpus <= 0;
@@ -350,6 +365,30 @@ function Results(props: {
       attention: pct < 90,
       content: (
         <>
+      <section className="card legacyCard" aria-labelledby="legacy-q">
+        <h3 id="legacy-q">What should be left at the age of {horizonAge}?</h3>
+        <p className="muted small">Your plan runs until age {horizonAge}. This sets the savings you need and the chance your money lasts. You can change the age under Assumptions.</p>
+        <div className="legacyOpts" role="radiogroup" aria-labelledby="legacy-q">
+          {([
+            ['spend', 'Nothing, I will spend all of it', `Spend your savings down to nothing by ${horizonAge}. The smallest pot you need.`],
+            ['intact', 'Keep the corpus intact for my descendants', `Live on a share of your savings each year and pass the full amount on, in today's money.`],
+          ] as const).map(([id, title, note]) => (
+            <button key={id} type="button" role="radio" aria-checked={view.legacy === id} className={`legacyOpt ${view.legacy === id ? 'on' : ''}`} onClick={() => setLegacy(id)}>
+              <span className="legacyDot" aria-hidden="true" />
+              <span>
+                <b>{title}</b>
+                <small>{note}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+        {intact ? (
+          <p className="muted small">
+            You will live on {pctText(rate)} of your savings each year. That is the assumption &ldquo;Safe yearly payout from your savings&rdquo; (3% cautious, 3.5% balanced, 4% the common rule, 4.5% bold). A lower share is safer but needs a bigger pot. You can change it under Assumptions.
+          </p>
+        ) : null}
+        <p className="muted small">Amounts are in today&rsquo;s money. Property you keep is counted separately, as a family reserve.</p>
+      </section>
       <section className="card hero verdictCard">
         <span className={`badge ${verdict.className}`}>Verdict: {verdict.label}</span>
         <h2>If you live to {horizonAge}, your money lasts in {pct} of 100 possible future scenarios.</h2>
@@ -371,24 +410,49 @@ function Results(props: {
               ? `, plus your ${formatEurFull(mort.monthlyEur)} mortgage until age ${mort.lastEndAge}`
               : `, plus about ${formatEurFull(mort.monthlyEur)} a month in mortgages, the last until age ${mort.lastEndAge}`
             : ''}
+          {intact ? `, keeping your savings intact for your descendants and living on ${pctText(rate)} of them each year` : `, with nothing left at ${horizonAge}`}
           .
         </p>
-        {failRest >= 3 && plan.monteCarlo.medianFailAge !== null && plan.monteCarlo.medianFailAge !== undefined ? (
+        {intact && failRest >= 3 ? (
+          <p className="lead">In the other {failRest} scenarios, your savings end up smaller than when you stopped working, or run out.</p>
+        ) : null}
+        {!intact && failRest >= 3 && plan.monteCarlo.medianFailAge !== null && plan.monteCarlo.medianFailAge !== undefined ? (
           <p className="lead">In the other {failRest} scenarios, your money runs out around age {plan.monteCarlo.medianFailAge} on average.</p>
         ) : null}
         <p className="muted small">
           We replay 100 different versions of the future, with good and bad markets and different inflation. We plan until age {horizonAge} so you are covered if you live long. You can change that age under Assumptions.
         </p>
-        <p className="detailLine">
-            On the day you stop, at {retireAge}, the plan projects {formatEur(plan.expected.corpusAtRetirement * toBasis)} ({unit})
-            {soldAtStop > 1000 ? `, including ${formatEur(soldAtStop)} from selling property that year` : ''}.{' '}
-            {noSavingsNeeded
-              ? `You would not need savings on the day you stop: your pensions, rent and later property sales already pay for your spending to ${horizonAge}, if returns are exactly average. The Savings over time slide uses a more cautious test.`
-              : `If returns are exactly average, about ${formatEur(plan.expected.requiredCorpus * toBasis)} would be just enough to last to ${horizonAge}. The Savings over time slide uses a more cautious test.`}
-            {earliest !== null && earliest < retireAge ? ` On average returns you could stop as early as ${earliest}.` : ''}
-            {earliest !== null && earliest > retireAge ? ` On average returns, the earliest age that fully works is ${earliest}.` : ''}
-            {earliest === null ? ' On average returns, no retirement age up to 75 fully works.' : ''}
+      </section>
+      <section className="card needCard" aria-label="Savings you need">
+        <h3>Savings you need on the day you stop (age {retireAge})</h3>
+        <p className="muted small">
+          {intact
+            ? `Based on living on ${pctText(rate)} of your savings each year, and keeping them intact.`
+            : `The smallest pot that lasts to ${horizonAge} if returns are exactly average. The same figure is used on the Savings over time slide.`}{' '}
+          Amounts are in {unit}.
+        </p>
+        {noSavingsNeeded && !intact ? (
+          <p className="detailLine">
+            You would not need savings on the day you stop: your pensions, rent and later property sales already pay for your spending to {horizonAge}, if returns are exactly average. In a typical future you are projected to have built up {formatEur(typicalAtStop)}{soldAtStop > 1000 ? `, including ${formatEur(soldAtStop)} from selling property that year` : ''}.
           </p>
+        ) : (
+          <div className="needRow">
+            <span className="needBig">{neededAtStop === null ? 'n/a' : formatEur(neededAtStop)}</span>
+            <span className="needSide">
+              whereas you are projected to have built up <strong>{formatEur(typicalAtStop)}</strong> in a typical future{soldAtStop > 1000 ? `, including ${formatEur(soldAtStop)} from selling property that year` : ''}
+            </span>
+          </div>
+        )}
+        {intact ? (
+          <p className="muted small">Keeping your savings intact means that at {horizonAge} they are still worth at least what they were when you stopped working, in today&rsquo;s money.</p>
+        ) : (
+          <p className="detailLine">
+            {earliest !== null && earliest < retireAge ? `On average returns you could stop as early as ${earliest}.` : ''}
+            {earliest !== null && earliest > retireAge ? `On average returns, the earliest age that fully works is ${earliest}.` : ''}
+            {earliest === null ? 'On average returns, no retirement age up to 75 fully works.' : ''}
+          </p>
+        )}
+
       </section>
       {mort.loans.length > 0 ? <MortgageTimeline loans={mort.loans} age={age} retireAge={retireAge} lastEnd={mort.lastEndAge} /> : null}
 
@@ -470,25 +534,15 @@ function Results(props: {
       content: (
         <>
       <section className="card">
-        <h3>Your corpus and what you need</h3>
-        <div className="chartControls">
-          <div>
-            <span className="lbl">Drawdown a year</span>
-            <div className="row">
-              {RATES.map((r) => (
-                <button key={r} type="button" className={rate === r ? 'on' : ''} aria-pressed={rate === r} onClick={() => setRate(r)}>
-                  {pctText(r)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <h3>Your savings and what you need</h3>
         <p className="muted tabnote">
-          The shaded years at the start are the years you still work. The teal line is the typical future of your savings and investments, and the shaded band holds 8 of 10 simulated futures. The amber line is the corpus you would need at each age, so that drawing {pctText(rate)} a year
-          plus your pensions pays for your spending that year, including Box 3 tax.{' '}
-          {free !== null ? `On this measure your corpus is enough from age ${free}.` : 'On this measure your corpus never gets there.'} A lower drawdown is safer for a long retirement, but needs a bigger corpus. This is a more cautious test than the break-even figure in the headline, which only asks whether your money lasts if returns are exactly average.
+          The shaded years at the start are the years you still work. The teal line is the typical future of your savings and investments, and the shaded band holds 8 of 10 simulated futures.{' '}
+          {intact
+            ? `The amber line is the savings you would need at each age so that living on ${pctText(rate)} of them a year plus your pensions pays for your spending that year, including Box 3 tax, while keeping them intact. A lower share is safer for a long retirement, but needs a bigger pot.`
+            : `The amber line is the smallest pot that would last to ${horizonAge} if returns are exactly average, at each age. Before the age you stop, it shows what you would need if you stopped at that age. It is the same figure as the headline, and no yearly percentage is involved.`}{' '}
+          {free !== null ? `On this measure your savings are enough from age ${free}.` : 'On this measure your savings never get there.'}
         </p>
-        <CorpusChart series={series} retireAge={retireAge} aowAge={aowAge} rate={rate} events={view.events} />
+        <CorpusChart series={series} retireAge={retireAge} aowAge={aowAge} rate={intact ? rate : null} endAge={horizonAge} events={view.events} />
       </section>
         </>
       ),
@@ -502,10 +556,10 @@ function Results(props: {
       <section className="card">
         <h3>What you need each month and what you would get</h3>
         <p className="muted tabnote">
-          Your monthly spending at each age, with inflation and the prices of the country you retire to, against pensions and rent plus {pctText(rate)} a year drawn from the corpus on the Savings over time slide, divided by 12. Amber shows any
-          shortfall. The chart starts at the age you stop working. Point at an age to see what changes then.
+          Your monthly spending at each age, with inflation and the prices of the country you retire to, against pensions and rent plus {intact ? `${pctText(rate)} a year drawn from your savings, divided by 12` : 'what your plan takes from your savings on average returns'}. Amber shows any
+          shortfall{intact ? '' : ', which appears only if your savings run out'}. The chart starts at the age you stop working. Point at an age to see what changes then.
         </p>
-        <MonthlyChart series={series} retireAge={retireAge} aowAge={aowAge} rate={rate} events={view.events} />
+        <MonthlyChart series={series} retireAge={retireAge} aowAge={aowAge} rate={intact ? rate : null} events={view.events} />
       </section>
         </>
       ),

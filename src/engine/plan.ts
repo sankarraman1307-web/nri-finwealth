@@ -38,6 +38,8 @@ export interface RunOptions {
   sweep?: boolean;
   /** Also compute what-if sensitivities (extra Monte Carlo runs). */
   sensitivities?: boolean;
+  /** Also compute the break-even savings at every age (about as costly as one Monte Carlo run). */
+  requiredCurve?: boolean;
 }
 
 const DEFAULT_PATHS = 1000;
@@ -61,6 +63,11 @@ export function requiredCorpusAtRetirement(
   stateAtRetirement: SimState,
   shocks: ReturnType<typeof expectedShocks>,
 ): number {
+  return requiredPotAt(ctx, stateAtRetirement, ctx.yearsToRetire, shocks);
+}
+
+/** The same test at any year t: the smallest pot, keeping the asset mix of that year, that lasts to the planning age on average returns. */
+function requiredPotAt(ctx: SimContext, stateAtRetirement: SimState, t0: number, shocks: ReturnType<typeof expectedShocks>): number {
   const total = sumPots(stateAtRetirement.pots);
   const shares = ASSET_CLASSES.map((c) => (total > 0 ? stateAtRetirement.pots[c] / total : c === 'eurEquity' ? 1 : 0));
 
@@ -70,7 +77,7 @@ export function requiredCorpusAtRetirement(
       pots[c] = amount * (shares[idx] as number);
     });
     const res = simulate(ctx, shocks, {
-      from: { state: { ...stateAtRetirement, pots }, t: ctx.yearsToRetire },
+      from: { state: { ...stateAtRetirement, pots }, t: t0 },
     });
     return res.depletedAtAge === null;
   };
@@ -125,11 +132,16 @@ export function collectWarnings(input: PlanInput, a: Assumptions, firstYear?: Ye
     );
   if (dest === 'both') {
     const months = Math.min(12, Math.max(0, input.snowbirdMonthsInIndia ?? 0));
-    push(
-      'snowbird-residency',
-      months >= 4 ? 'important' : 'caution',
-      `You plan about ${months} months a year in India. From around 120 to 182 days a year you can be treated as a tax resident of India, and your worldwide income can then be taxed there too (resident-but-not-ordinary status often limits this). The Dutch-Indian tax treaty decides if both countries claim you. Get advice before you commit to a split.`,
-    );
+    const tail =
+      ' Indian residency is judged on days in India during the Indian financial year (1 April to 31 March). You become an Indian tax resident from 182 days, or from 120 days if you are an Indian citizen with Indian income above 15 lakh rupees. As a returning NRI you may then count as resident but not ordinarily resident (RNOR), which limits what India taxes, and the Dutch-Indian treaty tie-breaker decides which country treats you as resident if both claim you. Please get advice before you commit to a split.';
+    let text: string;
+    if (months >= 6)
+      text = `You plan about ${months} months a year in India. At this length you will very likely be an Indian tax resident. Indian residency, RNOR status and the treaty tie-breaker are not modelled, so the results for Both are not reliable. Treat them as a rough guide only.${tail}`;
+    else if (months >= 4)
+      text = `You plan about ${months} months a year in India, which is about ${Math.round(months * 30.4)} days. That is close enough to the limits that you may become an Indian tax resident, and Indian residency rules are not modelled, so the results for Both may be too optimistic.${tail}`;
+    else
+      text = `You plan about ${months} months a year in India. Below about 4 months you are unlikely to become an Indian tax resident, but count your days: the limits are 120 and 182 days. Indian residency rules are not modelled.${tail}`;
+    push('snowbird-residency', months >= 4 ? 'important' : 'caution', text);
     push(
       'snowbird-model',
       'info',
@@ -428,7 +440,8 @@ export function runPlan(input: PlanInput, opts: RunOptions = {}): PlanResult {
   const seed = opts.seed ?? DEFAULT_SEED;
   const ctx = makeContext(input, a);
   const shocks = expectedShocks(a, ctx.horizon);
-  const expected = simulate(ctx, shocks);
+  const record: SimState[] = [];
+  const expected = simulate(ctx, shocks, { record });
 
   const corpus = sumPots(expected.stateAtRetirement.pots);
   const priceAtRetirement = (1 + a.inflationNl) ** ctx.yearsToRetire;
@@ -446,6 +459,9 @@ export function runPlan(input: PlanInput, opts: RunOptions = {}): PlanResult {
       corpusAtRetirement: corpus,
       corpusAtRetirementReal: corpus / priceAtRetirement,
       requiredCorpus: required,
+      ...(opts.requiredCurve
+        ? { requiredByAge: record.map((st, t) => ({ age: input.age + t, required: requiredPotAt(ctx, st, t, shocks) })) }
+        : {}),
       margin: corpus - required,
       coverageRatio: required > 0 && Number.isFinite(required) ? corpus / required : null,
       depletedAtAge: expected.depletedAtAge,
@@ -466,7 +482,7 @@ export function runPlan(input: PlanInput, opts: RunOptions = {}): PlanResult {
         monthlyTodayEur: (ctx.aowFullAnnualToday * ctx.aowAccrualShare) / 12,
       },
     },
-    monteCarlo: { successProbability: mc.successProbability, bands: mc.bands, p10DepletionAge: mc.p10DepletionAge, medianFailAge: mc.medianFailAge },
+    monteCarlo: { successProbability: mc.successProbability, bands: mc.bands, p10DepletionAge: mc.p10DepletionAge, medianFailAge: mc.medianFailAge, medianAtRetirementReal: mc.medianAtRetirementReal },
     verdict: verdictFor(mc.successProbability),
     warnings: collectWarnings(input, a, expected.rows[0]),
   };

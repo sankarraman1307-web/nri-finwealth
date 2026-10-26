@@ -357,3 +357,19 @@ footer .contact { margin-top: 8px; }
 .topFeedback { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--teal); }
 .feedbackPrompt { margin: 8px 0 4px; font-size: 14px; color: var(--muted); text-align: center; }
 .feedbackPrompt a, footer .contact a { color: var(--teal); font-weight: 700; }
+
+/* What should be left at the planning age */
+.legacyCard h3 { margin: 0 0 4px; font-size: 18px; }
+.legacyOpts { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.legacyOpt { height: auto; font-weight: 400; display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; min-height: 44px; padding: 14px 16px; border-radius: 14px; border: 1.5px solid #c3d0d8; background: #fff; color: var(--ink); cursor: pointer; font: inherit; }
+.legacyOpt b { display: block; font-size: 16px; }
+.legacyOpt small { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.legacyOpt:hover { background: #f4fafa; }
+.legacyOpt.on { border-color: var(--teal); background: #eef8f8; color: var(--ink); }
+.legacyDot { flex: none; width: 20px; height: 20px; margin-top: 2px; border-radius: 50%; border: 2px solid #8aa0ad; background: #fff; }
+.legacyOpt.on .legacyDot { border-color: var(--teal); background: radial-gradient(circle, var(--teal) 0 45%, #fff 50%); }
+.needCard h3 { margin: 0 0 4px; font-size: 18px; }
+.needRow { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; }
+.needBig { font-size: 36px; font-weight: 800; letter-spacing: -0.02em; color: var(--teal); }
+.needSide { font-size: 14px; color: var(--muted); }
+.needSide strong { color: var(--ink); }

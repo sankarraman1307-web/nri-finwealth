@@ -1,5 +1,5 @@
 import { percentile } from './rng';
-import { makeShockGenerator, simulate, type SimContext } from './simulate';
+import { makeShockGenerator, simulate, sumPots, type SimContext } from './simulate';
 import type { BandPoint } from './types';
 
 export interface MonteCarloResult {
@@ -8,6 +8,8 @@ export interface MonteCarloResult {
   p10DepletionAge: number | null;
   /** Typical (median) age at which the money runs out, among the paths that do run out. Null if none do. */
   medianFailAge: number | null;
+  /** Middle of the simulated futures for your savings on the day you stop (sales that year included), in today's euros. */
+  medianAtRetirementReal: number;
   paths: number;
 }
 
@@ -19,12 +21,17 @@ export function runMonteCarlo(ctx: SimContext, paths: number, seed: number): Mon
   const gen = makeShockGenerator(ctx.a, seed);
   const perYear: number[][] = Array.from({ length: ctx.horizon }, () => []);
   const depletion: number[] = [];
+  const atRetire: number[] = [];
+  const realFactor = (1 + ctx.a.inflationNl) ** ctx.yearsToRetire;
   let ok = 0;
 
   for (let p = 0; p < paths; p++) {
     const res = simulate(ctx, gen(ctx.horizon));
-    if (res.depletedAtAge === null) ok++;
-    else depletion.push(res.depletedAtAge);
+    const potAtStop = sumPots(res.stateAtRetirement.pots) / realFactor;
+    atRetire.push(potAtStop);
+    if (res.depletedAtAge !== null) depletion.push(res.depletedAtAge);
+    // Keeping savings intact: the money must also be worth at least as much (today's euros) at the end as on the day you stop.
+    else if (!ctx.input.leaveIntact || res.endingLiquidReal >= potAtStop) ok++;
     for (let t = 0; t < res.rows.length; t++) (perYear[t] as number[]).push((res.rows[t] as { liquidEndReal: number }).liquidEndReal);
   }
 
@@ -52,5 +59,7 @@ export function runMonteCarlo(ctx: SimContext, paths: number, seed: number): Mon
     medianFailAge = sorted[Math.floor((sorted.length - 1) / 2)] ?? null;
   }
 
-  return { successProbability: ok / paths, bands, p10DepletionAge, medianFailAge, paths };
+  const medianAtRetirementReal = percentile([...atRetire].sort((x, y) => x - y), 0.5);
+
+  return { successProbability: ok / paths, bands, p10DepletionAge, medianFailAge, medianAtRetirementReal, paths };
 }

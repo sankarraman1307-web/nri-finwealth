@@ -287,7 +287,7 @@ describe('the app starts empty, with no sample household', () => {
     }
   });
   it('does not pre-fill anything about your money, apart from the gold price you can change', () => {
-    const filled = Object.entries(EMPTY_PROFILE).filter(([k, v]) => typeof v === 'string' && v !== '' && k !== 'goldPrice' && k !== 'jewelleryPurity' && k !== 'destination' && k !== 'investMode' && k !== 'box3');
+    const filled = Object.entries(EMPTY_PROFILE).filter(([k, v]) => typeof v === 'string' && v !== '' && k !== 'goldPrice' && k !== 'jewelleryPurity' && k !== 'destination' && k !== 'investMode' && k !== 'box3' && k !== 'legacy');
     expect(filled).toEqual([]);
   });
 });

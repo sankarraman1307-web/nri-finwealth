@@ -187,7 +187,7 @@ function Frame(props: { svgRef: React.RefObject<SVGSVGElement | null>; label: st
 // 1. Your corpus versus the corpus you need
 // ---------------------------------------------------------------------------------------------
 
-export function CorpusChart(props: { series: DrawdownPoint[]; retireAge: number; aowAge: number; rate: number; events: Events }) {
+export function CorpusChart(props: { series: DrawdownPoint[]; retireAge: number; aowAge: number; rate: number | null; endAge?: number; events: Events }) {
   const { series, retireAge, aowAge, rate, events } = props;
   const first = series[0];
   const last = series[series.length - 1];
@@ -208,9 +208,10 @@ export function CorpusChart(props: { series: DrawdownPoint[]; retireAge: number;
   const free = independenceAge(series);
   const atRetire = series.find((p) => p.age === retireAge);
   const hit = cur.idx === null ? null : series[cur.idx];
-  const pct = `${(rate * 100).toFixed(1).replace(/\.0$/, '')}%`;
+  const pct = rate === null ? '' : `${(rate * 100).toFixed(1).replace(/\.0$/, '')}%`;
+  const neededName = rate === null ? `Savings you need to last to ${props.endAge ?? maxAge}` : `Needed at ${pct} a year`;
   const label =
-    `Your corpus compared with the corpus you need, from age ${minAge} to ${maxAge}. Drawdown rate ${pct}. ` +
+    `Your savings compared with the savings you need, from age ${minAge} to ${maxAge}. ${rate === null ? 'Needed is the smallest pot that lasts to the end of the plan.' : `Yearly payout ${pct}.`} ` +
     (atRetire ? `At ${retireAge} the typical future holds ${formatEur(atRetire.corpus)} and you need ${formatEur(atRetire.needed)}. ` : '') +
     (free !== null ? `The corpus first covers what is needed at age ${free}.` : 'The corpus never covers what is needed.');
 
@@ -221,7 +222,7 @@ export function CorpusChart(props: { series: DrawdownPoint[]; retireAge: number;
       handlers={cur.handlers}
       legend={
         <>
-          <span className="swatch line" /> Your corpus (typical future) &nbsp; <span className="swatch band" /> 8 in 10 futures &nbsp; <span className="swatch line amber" /> Corpus you need at {pct} a year &nbsp; <span className="swatch sq" style={{ background: BLUE, opacity: 0.25 }} /> Years you still work
+          <span className="swatch line" /> Your corpus (typical future) &nbsp; <span className="swatch band" /> 8 in 10 futures &nbsp; <span className="swatch line amber" /> {rate === null ? `Savings you need to last to ${props.endAge ?? maxAge}` : `Savings you need at ${pct} a year`} &nbsp; <span className="swatch sq" style={{ background: BLUE, opacity: 0.25 }} /> Years you still work
         </>
       }
     >
@@ -250,7 +251,7 @@ export function CorpusChart(props: { series: DrawdownPoint[]; retireAge: number;
               { label: 'Good luck (1 in 10)', value: formatEur(hit.high), color: TEAL },
               { label: 'Your corpus (typical)', value: formatEur(hit.corpus), color: INK },
               { label: 'Bad luck (1 in 10)', value: formatEur(hit.low), color: TEAL },
-              { label: `Needed at ${pct} a year`, value: formatEur(hit.needed), color: AMBER },
+              { label: neededName, value: formatEur(hit.needed), color: AMBER },
               { label: hit.corpus >= hit.needed ? 'Cushion' : 'Short by', value: formatEur(Math.abs(hit.corpus - hit.needed)), color: hit.corpus >= hit.needed ? TEAL : AMBER },
             ]}
           />
@@ -264,7 +265,7 @@ export function CorpusChart(props: { series: DrawdownPoint[]; retireAge: number;
 // 2. What you need each month versus what the corpus and pensions give
 // ---------------------------------------------------------------------------------------------
 
-export function MonthlyChart(props: { series: DrawdownPoint[]; retireAge: number; aowAge: number; rate: number; events: Events }) {
+export function MonthlyChart(props: { series: DrawdownPoint[]; retireAge: number; aowAge: number; rate: number | null; events: Events }) {
   const { rate, events } = props;
   const { retireAge, aowAge } = props;
   // Only from the age you stop working: that is when the corpus has to pay for your life.
@@ -287,22 +288,21 @@ export function MonthlyChart(props: { series: DrawdownPoint[]; retireAge: number
   const income = (p: DrawdownPoint) => p.pensions + p.drawdown;
   const needLine = series.map((p, i) => `${i === 0 ? 'M' : 'L'}${sc.x(p.age).toFixed(1)},${sc.y(p.monthlyNeed).toFixed(1)}`).join(' ');
   const hit = cur.idx === null ? null : series[cur.idx];
-  const pct = `${(rate * 100).toFixed(1).replace(/\.0$/, '')}%`;
+  const pct = rate === null ? '' : `${(rate * 100).toFixed(1).replace(/\.0$/, '')}%`;
   const atRetire = series.find((p) => p.age === retireAge);
   const label =
-    `Monthly spending compared with monthly income from pensions and a ${pct} drawdown, from age ${minAge} to ${maxAge}. ` +
-    (atRetire ? `At ${retireAge} you need ${formatEurFull(atRetire.monthlyNeed)} a month and the drawdown plus pensions give ${formatEurFull(income(atRetire))}.` : '');
+    `Monthly spending compared with monthly income from pensions${rate === null ? ' and what your plan takes from savings' : ` and a ${pct} drawdown`}, from age ${minAge} to ${maxAge}. ` +
+    (atRetire ? `At ${retireAge} you need ${formatEurFull(atRetire.monthlyNeed)} a month and the savings plus pensions give ${formatEurFull(income(atRetire))}.` : '');
 
   return (
     <Frame
       svgRef={cur.ref}
       label={label}
       handlers={cur.handlers}
-      note="Typical future for the corpus, average returns for spending. Spending includes the mortgage and Box 3 tax."
+      note={rate === null ? 'Average returns. Spending includes the mortgage and Box 3 tax.' : 'Typical future for the corpus, average returns for spending. Spending includes the mortgage and Box 3 tax.'}
       legend={
         <>
-          <span className="swatch line ink" /> What you need a month &nbsp; <span className="swatch sq" style={{ background: BLUE }} /> Pensions and rent &nbsp; <span className="swatch sq" style={{ background: TEAL }} /> Drawdown from the
-          corpus at {pct} &nbsp; <span className="swatch sq" style={{ background: AMBER }} /> Short of the safe draw
+          <span className="swatch line ink" /> What you need a month &nbsp; <span className="swatch sq" style={{ background: BLUE }} /> Pensions and rent &nbsp; <span className="swatch sq" style={{ background: TEAL }} /> {rate === null ? 'Taken from your savings' : `Drawdown from the corpus at ${pct}`} &nbsp; <span className="swatch sq" style={{ background: AMBER }} /> {rate === null ? 'Shortfall: savings run out' : 'Short of the safe draw'}
         </>
       }
     >
@@ -324,9 +324,9 @@ export function MonthlyChart(props: { series: DrawdownPoint[]; retireAge: number
             rows={[
               { label: 'You need', value: formatEurFull(hit.monthlyNeed), color: INK },
               { label: 'Pensions and rent', value: formatEurFull(hit.pensions), color: BLUE },
-              { label: `Drawdown at ${pct}`, value: formatEurFull(hit.drawdown), color: TEAL },
-              { label: hit.gap >= 0 ? 'Left over' : 'Short of the safe draw', value: formatEurFull(Math.abs(hit.gap)), color: hit.gap >= 0 ? TEAL : AMBER },
-              { label: 'Your plan takes from savings', value: formatEurFull(hit.actualFromSavings), color: INK },
+              { label: rate === null ? 'Taken from your savings' : `Drawdown at ${pct}`, value: formatEurFull(hit.drawdown), color: TEAL },
+              { label: rate === null ? 'Shortfall if savings run out' : hit.gap >= 0 ? 'Left over' : 'Short of the safe draw', value: formatEurFull(Math.abs(hit.gap)), color: hit.gap >= 0 ? TEAL : AMBER },
+              ...(rate === null ? [] : [{ label: 'Your plan takes from savings', value: formatEurFull(hit.actualFromSavings), color: INK }]),
             ]}
           />
         </>

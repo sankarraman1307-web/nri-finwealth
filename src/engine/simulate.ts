@@ -15,6 +15,9 @@ export interface SimContext {
   aowAccrualShare: number;
   /** Full-accrual AOW per year for the household, today's EUR (before the accrual share). */
   aowFullAnnualToday: number;
+  /** What you and your partner each get from AOW per year, today's EUR. Each starts at their own state pension age. */
+  aowYouToday: number;
+  aowPartnerToday: number;
 }
 
 export interface SimState {
@@ -103,6 +106,8 @@ export function makeContext(input: PlanInput, a: Assumptions): SimContext {
     // Partner is assumed to have the same NL residence record. An explicit input is a good v2.1 feature.
     aowAccrualShare: fullAnnual > 0 ? aowTotal / fullAnnual : accrualShare,
     aowFullAnnualToday: fullAnnual,
+    aowYouToday: ov ? (ov.you ?? perPerson * 12 * accrualShare) : perPerson * 12 * accrualShare,
+    aowPartnerToday: persons === 2 ? (ov ? (ov.partner ?? perPerson * 12 * accrualShare) : perPerson * 12 * accrualShare) : 0,
   };
 }
 
@@ -280,7 +285,9 @@ export function stepYear(
   let pensionGross = 0;
   let nlTaxable = 0;
   if (retired) {
-    const aow = age >= a.aowAge ? ctx.aowFullAnnualToday * ctx.aowAccrualShare * priceNl : 0;
+    // Each person's state pension starts at their own age. Without a partner age, the partner is taken to be your age.
+    const partnerAgeNow = (pe?.age ?? i.partnerAge ?? i.age) + t;
+    const aow = ((age >= a.aowAge ? ctx.aowYouToday : 0) + (partnerAgeNow >= a.aowAge ? ctx.aowPartnerToday : 0)) * priceNl;
     const supp = age >= a.aowAge ? i.dutchSuppPensionMonthly * 12 * priceNl : 0;
     const indian = age >= a.indiaPensionAge ? (i.inPensionAnnual * priceIn) / eurToInrNow : 0;
     pensionGross = aow + supp + indian;
@@ -471,7 +478,7 @@ export function stepYear(
 export function simulate(
   ctx: SimContext,
   shocks: YearShock[],
-  opts: { from?: { state: SimState; t: number } } = {},
+  opts: { from?: { state: SimState; t: number }; record?: SimState[] } = {},
 ): SimResult {
   const startT = opts.from?.t ?? 0;
   let state = opts.from?.state ?? initialState(ctx.input);
@@ -486,6 +493,8 @@ export function simulate(
       const sold = applySales(ctx, state, t);
       stateAtRetirement = { ...state, pots: sold.pots, propertyEur: sold.propertyEur, jewelleryEur: sold.jewelleryEur, salesDoneAt: t };
     }
+    // For the break-even curve: the state at the start of each year (on the day you stop, with that year's sales included).
+    if (opts.record) opts.record[t] = t === ctx.yearsToRetire ? stateAtRetirement : state;
     const shock = shocks[t];
     if (!shock) throw new Error(`Missing shock for year ${t}`);
     const step = stepYear(ctx, state, t, shock);

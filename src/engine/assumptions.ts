@@ -11,6 +11,7 @@ import { ASSET_CLASSES } from './types';
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   planToAge: 95,
   aowAge: 68,
+  safeWithdrawalRate: 0.035,
   indiaPensionAge: 60,
   inflationNl: 0.024,
   inflationIn: 0.05,

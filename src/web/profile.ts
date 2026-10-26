@@ -110,6 +110,7 @@ export const ASSUMPTION_FIELDS: AssumptionField[] = [
   { key: 'ret-inrFd', label: 'Indian fixed deposits, interest a year', min: 0, max: 15, ...retOf('inrFd') },
   { key: 'realEstateGrowthNl', label: 'Dutch house prices, growth a year', min: -3, max: 12, read: (a) => a.realEstateGrowthNl * 100, write: (o, v) => void (o.realEstateGrowthNl = v / 100) },
   { key: 'realEstateGrowthIn', label: 'Indian property, growth a year in rupees', min: -3, max: 20, read: (a) => a.realEstateGrowthIn * 100, write: (o, v) => void (o.realEstateGrowthIn = v / 100) },
+  { key: 'safeWithdrawalRate', label: 'Safe yearly payout from your savings', hint: 'Only used if you keep your savings intact for your descendants. A lower share is safer but needs a bigger pot: 3% cautious, 3.5% balanced, 4% the common rule, 4.5% bold.', min: 2, max: 6, read: (a) => a.safeWithdrawalRate * 100, write: (o, v) => void (o.safeWithdrawalRate = v / 100) },
   { key: 'indiaCostFactor', label: 'Living costs in India, as a share of the Netherlands', hint: 'For example 38 means a lifestyle that costs €1,000 here costs €380 there.', min: 10, max: 150, read: (a) => a.indiaCostFactor * 100, write: (o, v) => void (o.indiaCostFactor = v / 100) },
 ];
 
@@ -131,6 +132,8 @@ export interface Profile {
   nlInvestments: string;
   /** The one-number answer from the quick questions: savings and investments in the Netherlands. Used only while cash and investments below are both blank. */
   savingsQuick: string;
+  /** What should be left at the planning age: nothing (spend it all) or the savings kept intact for descendants. */
+  legacy: 'spend' | 'intact';
   hasRuling: boolean;
   /** Whole years the 30% ruling still runs, counting this year. */
   rulingYears: string;
@@ -196,6 +199,7 @@ export const SAMPLE_PROFILE: Profile = {
   nlCash: '25000',
   nlInvestments: '190000',
   savingsQuick: '',
+  legacy: 'spend',
   hasRuling: true,
   rulingYears: '3',
   rulingBefore2024: false,
@@ -250,6 +254,7 @@ export const EMPTY_PROFILE: Profile = {
   nlCash: '',
   nlInvestments: '',
   savingsQuick: '',
+  legacy: 'spend',
   hasRuling: false,
   rulingYears: '',
   rulingBefore2024: false,
@@ -363,6 +368,7 @@ export interface Parsed {
   hasRuling: boolean;
   rulingYears: number;
   rulingBefore2024: boolean;
+  legacy: 'spend' | 'intact';
   partner2: PartnerEarner | null;
   expenses: YearlyExpense[];
   properties: Property[];
@@ -800,6 +806,7 @@ export function parseProfile(p: Profile): ParseResult {
       hasRuling: p.hasRuling,
       rulingYears,
       rulingBefore2024: p.hasRuling && p.rulingBefore2024,
+      legacy: p.legacy === 'intact' ? 'intact' : 'spend',
       partner2,
       expenses,
       properties,
@@ -867,6 +874,7 @@ export function toPlanInput(v: Parsed, eurToInr: number, startYear: number): Pla
 
     eurToInr,
 
+    ...(v.legacy === 'intact' ? { leaveIntact: true } : {}),
     ...(v.partner2 && v.partner ? { partnerEarner: v.partner2 } : {}),
     country: 'nl',
     ...(v.incomeStreams.length > 0 ? { incomeStreams: v.incomeStreams } : {}),

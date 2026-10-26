@@ -112,6 +112,8 @@ export interface PlanInput {
   incomeStreams?: IncomeStream[];
   /** Your partner's age, for partner pensions when the partner has no salary. */
   partnerAge?: number;
+  /** True when the goal is to keep the savings intact (in today's money) until the planning age, not to spend them down. */
+  leaveIntact?: boolean;
   /** A fixed monthly investment. Absent = everything left over after spending is saved. */
   monthlyInvesting?: MonthlyInvesting;
   /**
@@ -215,6 +217,8 @@ export interface Assumptions {
   planToAge: number;
   /** Age at which AOW starts. Legal age rises with life expectancy: 68 is a prudent default for people under ~50. */
   aowAge: number;
+  /** The share of savings that can safely be paid out each year without shrinking them. Used only when you want to keep your savings intact. */
+  safeWithdrawalRate: number;
   indiaPensionAge: number;
   inflationNl: number;
   inflationIn: number;
@@ -341,6 +345,8 @@ export interface PlanResult {
     corpusAtRetirement: number;
     corpusAtRetirementReal: number;
     requiredCorpus: number;
+    /** Only when asked for: the smallest savings that last to the planning age, at the start of each year, nominal euros. Infinity if impossible. */
+    requiredByAge?: { age: number; required: number }[];
     /** corpusAtRetirement - requiredCorpus. Not capped: negative means a shortfall. */
     margin: number;
     /** corpus / required. null when nothing is required (pensions cover everything). */
@@ -365,6 +371,8 @@ export interface PlanResult {
     p10DepletionAge: number | null;
     /** Typical (median) age the money runs out, among the simulated paths that run out. Null if none do. */
     medianFailAge: number | null;
+    /** Middle of the simulated futures for your savings on the day you stop, in today's euros. */
+    medianAtRetirementReal: number;
   };
   verdict: Verdict;
   warnings: Warning[];

@@ -13,6 +13,8 @@ export interface MonthlyPoint {
   spend: number;
   /** Income beyond spending, which you save. */
   saved: number;
+  /** The part of the gap that could not be paid because the savings ran out (average returns). */
+  unmet?: number;
 }
 
 export function monthlySeries(rows: YearRow[], inflationNl: number): MonthlyPoint[] {
@@ -22,7 +24,7 @@ export function monthlySeries(rows: YearRow[], inflationNl: number): MonthlyPoin
     const otherIncome = (r.pensionGross - r.pensionTax + r.passiveNet) / per;
     const spend = (r.totalSpend + r.box3Tax) / per;
     const gap = spend - netPay - otherIncome;
-    return { age: r.age, netPay, otherIncome, fromSavings: Math.max(0, gap), spend, saved: Math.max(0, -gap) };
+    return { age: r.age, netPay, otherIncome, fromSavings: Math.max(0, gap), spend, saved: Math.max(0, -gap), unmet: r.unmetDeficit / per };
   });
 }
 
@@ -53,8 +55,14 @@ export interface DrawdownPoint {
 export type EuroBasis = 'today' | 'future';
 
 /**
- * Joins the simulated corpus with the monthly spending picture, for a fixed drawdown rate.
+ * Joins the simulated corpus with the monthly spending picture.
  *
+ * Two ways to define the needed corpus, chosen by the question "what should be left at 95":
+ * - 'spend' (spend it all): the break-even from the engine at every age (`required`, nominal euros at the start of that year).
+ *   No percentage is involved. The monthly picture shows what the plan takes from savings and any shortfall.
+ * - 'intact' (keep it intact): needed corpus = 12 x (monthly spending - pensions and rent) / rate.
+ *
+ * For 'intact':
  * - Needed corpus = 12 x (monthly spending - pensions and rent) / rate. Spending already includes Box 3 tax,
  *   the mortgage and prices in the country you retire to. Once pensions cover everything, nothing is needed.
  * - Drawdown = corpus x rate / 12, taken from the middle of the simulated futures.
@@ -66,31 +74,45 @@ export type EuroBasis = 'today' | 'future';
 export function drawdownSeries(
   bands: BandPoint[],
   monthly: MonthlyPoint[],
-  opts: { rate: number; inflation: number; startAge: number; basis: EuroBasis },
+  opts: { mode?: 'spend' | 'intact'; rate: number; inflation: number; startAge: number; basis: EuroBasis; retireAge?: number; required?: { age: number; required: number }[]; curve?: CorpusPoint[] },
 ): DrawdownPoint[] {
   const byAge = new Map(monthly.map((m) => [m.age, m]));
+  const reqByAge = new Map((opts.required ?? []).map((r) => [r.age, r.required]));
+  const curveByAge = new Map((opts.curve ?? []).map((c) => [c.retirementAge, c.required]));
+  const spendAll = opts.mode === 'spend';
+  const retireAge = opts.retireAge ?? opts.startAge;
   const out: DrawdownPoint[] = [];
   for (const b of bands) {
     const m = byAge.get(b.age);
     if (!m) continue;
     const f = opts.basis === 'future' ? (1 + opts.inflation) ** (b.age - opts.startAge) : 1;
     const need = m.spend * f;
-    const pensions = m.otherIncome * f;
+    // Spend-all counts pay that still comes in (a partner who keeps working) with the pensions, so only real shortfalls show.
+    const pensions = (m.otherIncome + (spendAll ? m.netPay : 0)) * f;
     const corpus = b.p50 * f;
-    const drawdown = (corpus * opts.rate) / 12;
+    // Spend-all: the plan's own withdrawals on average returns. Keep-intact: the chosen share of the typical corpus.
+    const drawdown = spendAll ? Math.max(0, m.fromSavings - (m.unmet ?? 0)) * f : (corpus * opts.rate) / 12;
+    // The break-even is stored at the start of each year. The band for age A is the money you hold at the start of age A.
+    // Before you stop, the line answers "what would I need if I stopped at this age" (same test as the earliest-age curve, in today's euros).
+    const req = reqByAge.get(b.age);
+    const real = b.age < retireAge ? curveByAge.get(b.age) : req === undefined ? undefined : req / (1 + opts.inflation) ** (b.age - opts.startAge);
+    const breakEven = real === undefined ? Infinity : real * f;
     out.push({
       age: b.age,
       corpus,
       low: b.p10 * f,
       high: b.p90 * f,
-      needed: (12 * Math.max(0, need - pensions)) / opts.rate,
+      needed: spendAll ? breakEven : (12 * Math.max(0, need - pensions)) / opts.rate,
       monthlyNeed: need,
       pensions,
       drawdown,
-      gap: drawdown + pensions - need,
+      gap: spendAll ? -((m.unmet ?? 0) * f) : drawdown + pensions - need,
       actualFromSavings: m.fromSavings * f,
     });
   }
+  // A needed corpus that cannot be reached at all is drawn at the top of the chart instead of going off it.
+  const cap = Math.max(1, ...out.map((p) => p.high), ...out.filter((p) => Number.isFinite(p.needed)).map((p) => p.needed)) * 1.2;
+  for (const p of out) if (!Number.isFinite(p.needed)) p.needed = cap;
   return out;
 }
 
@@ -119,6 +141,7 @@ export function planEvents(input: PlanInput, a: Pick<Assumptions, 'aowAge' | 'in
   if (input.retirementDestination === 'in') add(input.retirementAge, 'You move to India');
   const labels = countryPack(input.country).labels;
   add(a.aowAge, `State pension (${labels.statePension}) starts`);
+  if (partner && pAge !== undefined && pAge !== input.age) add(own('partner', a.aowAge), `Your partner's state pension (${labels.statePension}) starts`);
   const regime = labels.foreignWorkerRegime;
   if (regime && input.rulingYearsLeft > 0) {
     add(input.age + input.rulingYearsLeft, `${regime} ends`);
