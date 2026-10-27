@@ -136,3 +136,23 @@ describe('the warning for Both', () => {
     expect(w(4)).toMatch(/may become an Indian tax resident/);
   });
 });
+
+describe('plan for me to live until age', () => {
+  it('is an assumption you can change, 95 by default, with a range of 80 to 105', () => {
+    expect(DEFAULT_ASSUMPTIONS.planToAge).toBe(95);
+    const ok = parseProfile({ ...SAMPLE_PROFILE, assumptions: { planToAge: '90' } });
+    expect(ok.ok && ok.value.overrides.planToAge).toBe(90);
+    expect(parseProfile({ ...SAMPLE_PROFILE, assumptions: { planToAge: '70' } }).ok).toBe(false);
+    expect(parseProfile({ ...SAMPLE_PROFILE, assumptions: { planToAge: '120' } }).ok).toBe(false);
+  });
+  it('a shorter plan needs less savings and the horizon follows', () => {
+    const v = (age: string) => computeView({ ...SAMPLE_PROFILE, assumptions: { planToAge: age } }, 90, 2026)!;
+    expect(v('85').plan.expected.requiredCorpus).toBeLessThan(v('100').plan.expected.requiredCorpus);
+    expect(v('85').plan.meta.horizonYears).toBe(85 - 45);
+  });
+  it('a planning age before an age you entered (here a jewellery sale) is refused with a clear message, not a crash', () => {
+    const r = parseProfile({ ...SAMPLE_PROFILE, jewelleryGrams: '100', jewellerySell: true, jewellerySellAge: '90', assumptions: { planToAge: '85' } });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.assumptionErrors.planToAge).toMatch(/planning age/i);
+  });
+});

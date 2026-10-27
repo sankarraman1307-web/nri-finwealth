@@ -2,7 +2,7 @@
  * The quick-start profile: what a person types, how we read it, and how it becomes a PlanInput.
  * Pure TypeScript (no React), so it is easy to test.
  */
-import { countryPack, DEFAULT_ASSUMPTIONS, type Assumptions, type AssumptionOverrides, type Destination, type IncomeStream, type MonthlyInvesting, type PartnerEarner, type PlanInput, type Property, type YearlyExpense } from '../engine';
+import { countryPack, DEFAULT_ASSUMPTIONS, validateInput, type Assumptions, type AssumptionOverrides, type Destination, type IncomeStream, type MonthlyInvesting, type PartnerEarner, type PlanInput, type Property, type YearlyExpense } from '../engine';
 
 /** One line in the "yearly extras" list, as typed. */
 export interface ExpenseRow {
@@ -110,6 +110,7 @@ export const ASSUMPTION_FIELDS: AssumptionField[] = [
   { key: 'ret-inrFd', label: 'Indian fixed deposits, interest a year', min: 0, max: 15, ...retOf('inrFd') },
   { key: 'realEstateGrowthNl', label: 'Dutch house prices, growth a year', min: -3, max: 12, read: (a) => a.realEstateGrowthNl * 100, write: (o, v) => void (o.realEstateGrowthNl = v / 100) },
   { key: 'realEstateGrowthIn', label: 'Indian property, growth a year in rupees', min: -3, max: 20, read: (a) => a.realEstateGrowthIn * 100, write: (o, v) => void (o.realEstateGrowthIn = v / 100) },
+  { key: 'planToAge', label: 'Plan for me to live until age', hint: 'Pick a long age, not the average. At 95 you are covered if you live long. A lower age needs less savings, but you carry the risk of outliving your money.', min: 80, max: 105, read: (a) => a.planToAge, write: (o, v) => void (o.planToAge = Math.round(v)) },
   { key: 'safeWithdrawalRate', label: 'Safe yearly payout from your savings', hint: 'Only used if you keep your savings intact for your descendants. A lower share is safer but needs a bigger pot: 3% cautious, 3.5% balanced, 4% the common rule, 4.5% bold.', min: 2, max: 6, read: (a) => a.safeWithdrawalRate * 100, write: (o, v) => void (o.safeWithdrawalRate = v / 100) },
   { key: 'indiaCostFactor', label: 'Living costs in India, as a share of the Netherlands', hint: 'For example 38 means a lifestyle that costs €1,000 here costs €380 there.', min: 10, max: 150, read: (a) => a.indiaCostFactor * 100, write: (o, v) => void (o.indiaCostFactor = v / 100) },
 ];
@@ -417,7 +418,17 @@ const wholeNumber = (text: string): number | null => {
   return /^\d+$/.test(t) ? Number(t) : null;
 };
 
+/** Reads the form. A custom "plan for me to live until age" is also checked against the ages you entered (stop working, sales). */
 export function parseProfile(p: Profile): ParseResult {
+  const r = parseProfileCore(p);
+  if (!r.ok || r.value.overrides.planToAge === undefined) return r;
+  const planTo = r.value.overrides.planToAge;
+  const bad = validateInput(toPlanInput(r.value, 90, 2026), planTo).find((i) => i.level === 'error');
+  if (!bad) return r;
+  return { ok: false, errors: { assumptions: 'Check the assumptions marked below.' }, propertyErrors: {}, pensionErrors: {}, assumptionErrors: { planToAge: `${bad.message}. Choose a later age, or change that answer.` } };
+}
+
+function parseProfileCore(p: Profile): ParseResult {
   const errors: ProfileErrors = {};
 
   const age = wholeNumber(p.age);

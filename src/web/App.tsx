@@ -329,7 +329,6 @@ function Results(props: {
   const mort = useMemo(() => mortgageSummary(profile, eurToInr), [profile, eurToInr]);
   const verdict = VERDICT[plan.verdict];
   const horizonAge = age + plan.meta.horizonYears;
-  const gap = plan.expected.margin * (basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1);
   const earliest = earliestFeasibleAge(curve);
   const series = useMemo(
     () =>
@@ -354,6 +353,9 @@ function Results(props: {
   const typicalAtStop = view.typicalAtStop * toBasis;
   const bridge = useMemo(() => bridgeCheck(plan, retireAge, aowAge, view.inflation, basis), [plan, retireAge, aowAge, view.inflation, basis]);
   const topWarning = plan.warnings.find((w) => w.severity === 'important');
+  const warnParts = topWarning ? topWarning.message.split(/(?<=[.!?])\s+/) : [];
+  const warnFirst = warnParts[0] ?? '';
+  const warnRest = warnParts.slice(1).join(' ');
   const noSavingsNeeded = plan.expected.requiredCorpus <= 0;
   // Property sold in the year you stop is part of the corpus on that day.
   const soldAtStop = plan.expected.rows.filter((r) => r.age === retireAge).reduce((t, r) => t + r.saleProceeds, 0) * (basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1);
@@ -365,30 +367,6 @@ function Results(props: {
       attention: pct < 90,
       content: (
         <>
-      <section className="card legacyCard" aria-labelledby="legacy-q">
-        <h3 id="legacy-q">What should be left at the age of {horizonAge}?</h3>
-        <p className="muted small">Your plan runs until age {horizonAge}. This sets the savings you need and the chance your money lasts. You can change the age under Assumptions.</p>
-        <div className="legacyOpts" role="radiogroup" aria-labelledby="legacy-q">
-          {([
-            ['spend', 'Nothing, I will spend all of it', `Spend your savings down to nothing by ${horizonAge}. The smallest pot you need.`],
-            ['intact', 'Keep the corpus intact for my descendants', `Live on a share of your savings each year and pass the full amount on, in today's money.`],
-          ] as const).map(([id, title, note]) => (
-            <button key={id} type="button" role="radio" aria-checked={view.legacy === id} className={`legacyOpt ${view.legacy === id ? 'on' : ''}`} onClick={() => setLegacy(id)}>
-              <span className="legacyDot" aria-hidden="true" />
-              <span>
-                <b>{title}</b>
-                <small>{note}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-        {intact ? (
-          <p className="muted small">
-            You will live on {pctText(rate)} of your savings each year. That is the assumption &ldquo;Safe yearly payout from your savings&rdquo; (3% cautious, 3.5% balanced, 4% the common rule, 4.5% bold). A lower share is safer but needs a bigger pot. You can change it under Assumptions.
-          </p>
-        ) : null}
-        <p className="muted small">Amounts are in today&rsquo;s money. Property you keep is counted separately, as a family reserve.</p>
-      </section>
       <section className="card hero verdictCard">
         <span className={`badge ${verdict.className}`}>Verdict: {verdict.label}</span>
         <h2>If you live to {horizonAge}, your money lasts in {pct} of 100 possible future scenarios.</h2>
@@ -403,26 +381,68 @@ function Results(props: {
             <span>100</span>
           </div>
         </div>
+        <div className="placeTiles" role="radiogroup" aria-label="Where you retire. Each shows the chance your money lasts.">
+          {compare.map((c) => {
+            const on = c.destination === destination;
+            const shown = on ? pct : Math.round(c.successProbability * 100);
+            return (
+              <button key={c.destination} type="button" role="radio" aria-checked={on} className={`placeTile ${on ? 'on' : ''}`} onClick={() => setDestination(c.destination)}>
+                <span>{c.destination === 'nl' ? 'Netherlands' : c.destination === 'in' ? 'India' : `Both (${view.compareMonths} mo.)`}</span>
+                <b>{shown}%</b>
+              </button>
+            );
+          })}
+        </div>
+        <p className="muted small">
+          Chance your money lasts to {horizonAge}, by where you retire. India and Both look better than they are: Indian taxes and healthcare costs are not included yet. Both assumes {view.compareMonths} months a year in India.
+        </p>
+        <div className="legacyRow">
+          <span className="lbl" id="legacy-q">What should be left at {horizonAge}?</span>
+          <div className="legacySwitch">
+            <span className={`side left ${intact ? '' : 'active'}`} onClick={() => setLegacy('spend')}>Nothing</span>
+            <button type="button" className="cap" role="switch" aria-checked={intact} aria-labelledby="legacy-q" onClick={() => setLegacy(intact ? 'spend' : 'intact')}>
+              <span className="knob" />
+            </button>
+            <span className={`side right ${intact ? 'active' : ''}`} onClick={() => setLegacy('intact')}>An inheritance</span>
+          </div>
+          <p className="muted small legacyHint">
+            {intact
+              ? `You live on ${pctText(rate)} of your savings each year and pass the full amount on to your descendants, in today's money. A lower share is safer but needs a bigger pot. Change it under Assumptions: "Safe yearly payout from your savings".`
+              : `Your savings run down to nothing by ${horizonAge}, so you need the smallest pot.`}
+          </p>
+        </div>
         <p className="lead">
-          Retiring at {retireAge}, living on about {formatEurFull(spendNow)} a month in today&rsquo;s money
+          Retire at {retireAge}, living on about {formatEurFull(spendNow)} a month in today&rsquo;s money
           {mort.count > 0 && mort.monthlyEur > 0 && mort.lastEndAge !== null
             ? mort.count === 1
               ? `, plus your ${formatEurFull(mort.monthlyEur)} mortgage until age ${mort.lastEndAge}`
               : `, plus about ${formatEurFull(mort.monthlyEur)} a month in mortgages, the last until age ${mort.lastEndAge}`
             : ''}
-          {intact ? `, keeping your savings intact for your descendants and living on ${pctText(rate)} of them each year` : `, with nothing left at ${horizonAge}`}
+          {intact ? `, keeping your savings intact and living on ${pctText(rate)} of them each year` : `, with nothing left at ${horizonAge}`}
           .
+          {failRest >= 3
+            ? intact
+              ? ` In the other ${failRest} scenarios, your savings end up smaller than when you stopped working, or run out.`
+              : plan.monteCarlo.medianFailAge !== null && plan.monteCarlo.medianFailAge !== undefined
+                ? ` In the other ${failRest} scenarios, your money runs out around age ${plan.monteCarlo.medianFailAge} on average.`
+                : ''
+            : ''}
         </p>
-        {intact && failRest >= 3 ? (
-          <p className="lead">In the other {failRest} scenarios, your savings end up smaller than when you stopped working, or run out.</p>
-        ) : null}
-        {!intact && failRest >= 3 && plan.monteCarlo.medianFailAge !== null && plan.monteCarlo.medianFailAge !== undefined ? (
-          <p className="lead">In the other {failRest} scenarios, your money runs out around age {plan.monteCarlo.medianFailAge} on average.</p>
-        ) : null}
-        <p className="muted small">
-          We replay 100 different versions of the future, with good and bad markets and different inflation. We plan until age {horizonAge} so you are covered if you live long. You can change that age under Assumptions.
-        </p>
+        <details className="howto">
+          <summary>How to read this</summary>
+          <p className="muted small">
+            We replay 100 different versions of the future, with good and bad markets and different inflation. Your money has to last until age {horizonAge}, so you are covered if you live long. Change this under Assumptions: &ldquo;Plan for me to live until age&rdquo;. Amounts are in today&rsquo;s money. Property you keep is counted separately, as a family reserve.
+          </p>
+        </details>
       </section>
+      {warnRest ? (
+        <details className="banner" role="note">
+          <summary>{warnFirst}</summary>
+          <p>{warnRest}</p>
+        </details>
+      ) : topWarning ? (
+        <div className="banner" role="note">{warnFirst}</div>
+      ) : null}
       <section className="card needCard" aria-label="Savings you need">
         <h3>Savings you need on the day you stop (age {retireAge})</h3>
         <p className="muted small">
@@ -455,37 +475,6 @@ function Results(props: {
 
       </section>
       {mort.loans.length > 0 ? <MortgageTimeline loans={mort.loans} age={age} retireAge={retireAge} lastEnd={mort.lastEndAge} /> : null}
-
-          {topWarning ? (
-            <div className="card alert" role="note">
-              {topWarning.message}
-            </div>
-          ) : null}
-      <section className="card controls">
-        <div>
-          <span className="lbl">Retire in</span>
-          <div className="row">
-            {(['nl', 'both', 'in'] as const).map((d) => (
-              <button key={d} type="button" className={destination === d ? 'on' : ''} aria-pressed={destination === d} onClick={() => setDestination(d)}>
-                {d === 'nl' ? 'Netherlands' : d === 'both' ? 'Both (snowbird)' : 'India'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="compareWrap">
-          <span className="lbl compareLbl">Chance your money lasts to {horizonAge}, by place to retire</span>
-          <div className="compare" aria-label="Chance your money lasts, by place to retire">
-            {compare.map((c) => (
-              <div key={c.destination} className={`opt ${c.destination === destination ? 'on' : ''}`}>
-                <span>{c.destination === 'nl' ? 'Netherlands' : c.destination === 'in' ? 'India' : `Both (${view.compareMonths} mo.)`}</span>
-                <b>{Math.round(c.successProbability * 100)}%</b>
-                <span>money lasts</span>
-              </div>
-            ))}
-          </div>
-          <p className="muted small">India results look rosier than they are: Indian income tax and private healthcare are not modelled yet. The Both card assumes {view.compareMonths} months a year in India.</p>
-        </div>
-      </section>
         </>
       ),
     },
@@ -587,21 +576,6 @@ function Results(props: {
           </p>
         </section>
       ) : null}
-
-      <section className="tiles">
-        <div className="card">
-          <span className="k">Projected at {retireAge}, {unit}</span>
-          <span className="v">{formatEur(plan.expected.corpusAtRetirement * toBasis)}</span>
-        </div>
-        <div className="card">
-          <span className="k">Break-even at {retireAge}, {unit}</span>
-          <span className="v">{noSavingsNeeded ? 'Not needed' : formatEur(plan.expected.requiredCorpus * toBasis)}</span>
-        </div>
-        <div className="card">
-          <span className="k">{gap < 0 ? 'Shortfall' : 'Cushion'}, {unit}</span>
-          <span className={`v ${gap < 0 ? 'bad' : 'good'}`}>{formatEur(Math.abs(gap))}</span>
-        </div>
-      </section>
 
       <section className="card">
         <h3>What this model does not know yet</h3>
