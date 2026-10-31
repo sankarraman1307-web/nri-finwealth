@@ -5,5 +5,6 @@ import guidePages from './scripts/vite-guides.mjs';
 
 export default defineConfig({
   plugins: [react(), guidePages()],
+  build: { chunkSizeWarningLimit: 1300 },
   test: { include: ['tests/**/*.test.ts'] },
 });

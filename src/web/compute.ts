@@ -7,6 +7,7 @@ import {
   runPlan,
   type CorpusPoint,
   type Destination,
+  type Assumptions,
   type DestinationCompare,
   type HouseholdRuling,
   type PlanResult,
@@ -31,6 +32,8 @@ export interface View {
   typicalAtStop: number;
   /** Dutch inflation assumed, for showing amounts in future euros. */
   inflation: number;
+  /** The assumptions used in this run, after your changes. */
+  assumptions: Assumptions;
   /** Months in India used for the "Both" card. */
   compareMonths: number;
   /** What happens at which age, for the chart tooltips. */
@@ -62,6 +65,7 @@ export function computeView(profile: Profile, eurToInr: number, startYear: numbe
     safeRate: a.safeWithdrawalRate,
     typicalAtStop: plan.monteCarlo.medianAtRetirementReal * (1 + a.inflationNl) ** (parsed.value.retireAge - parsed.value.age),
     inflation: a.inflationNl,
+    assumptions: a,
     compareMonths,
     events: planEvents(input, a),
     bridge: bridgeCheck(plan, parsed.value.retireAge, a.aowAge, a.inflationNl),

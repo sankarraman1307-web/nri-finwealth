@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Destination } from '../engine';
 import { computeView, type View } from './compute';
 import { CorpusChart, MonthlyChart } from './charts';
-import { bridgeCheck, drawdownSeries, earliestFeasibleAge, independenceAge, type EuroBasis } from './chartData';
+import { type EuroBasis } from './chartData';
+import { deriveResults } from './derive';
+import { downloadReport } from './report/download';
 import QuickStart, { GROUPS, groupOfField } from './QuickStart';
 import RulingCard from './RulingCard';
 import Recommend from './RecommendSlide';
@@ -315,6 +317,14 @@ function Results(props: {
     return m ? Math.min(5, Math.max(0, Number(m[1]) - 1)) : 0;
   });
   const [all, setAll] = useState(false);
+  const [pdf, setPdf] = useState<'idle' | 'busy' | 'error'>('idle');
+  const savePdf = () => {
+    setPdf('busy');
+    // Let the button repaint first: the what-if runs take a moment.
+    window.setTimeout(() => {
+      downloadReport(view, profile, eurToInr, startYear).then(() => setPdf('idle'), () => setPdf('error'));
+    }, 30);
+  };
   // The address bar follows the slide, so a slide can be bookmarked and the browser's Back button works.
   useEffect(() => {
     const want = `#s${slide + 1}`;
@@ -339,45 +349,9 @@ function Results(props: {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const intact = view.legacy === 'intact';
-  // The yearly share of savings you live on. Only used, and only shown, when you keep your savings intact.
-  const rate = view.safeRate;
-  const pct = Math.round(plan.monteCarlo.successProbability * 100);
-  const failRest = 100 - pct;
-  const spendNow = parseMoney(profile.living, 'eur') ?? 0;
-  const mort = useMemo(() => mortgageSummary(profile, eurToInr), [profile, eurToInr]);
+  const d = useMemo(() => deriveResults(view, profile, eurToInr, basis), [view, profile, eurToInr, basis]);
+  const { intact, rate, pct, failRest, spendNow, mort, horizonAge, earliest, series, free, unit, neededAtStop, typicalAtStop, bridge, topWarning, warnFirst, warnRest, noSavingsNeeded, soldAtStop } = d;
   const verdict = VERDICT[plan.verdict];
-  const horizonAge = age + plan.meta.horizonYears;
-  const earliest = earliestFeasibleAge(curve);
-  const series = useMemo(
-    () =>
-      drawdownSeries(plan.monteCarlo.bands, monthly, {
-        mode: intact ? 'intact' : 'spend',
-        rate,
-        inflation: view.inflation,
-        startAge: age,
-        basis,
-        retireAge,
-        ...(plan.expected.requiredByAge ? { required: plan.expected.requiredByAge } : {}),
-        curve,
-      }),
-    [plan, monthly, curve, intact, rate, basis, view.inflation, age, retireAge],
-  );
-  const free = independenceAge(series);
-  const unit = basis === 'future' ? 'future euros' : "today's euros";
-  // Values the engine gives at the day you stop are in that year's euros. 'today' removes inflation since now.
-  const toBasis = basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1;
-  // One definition of "needed", chosen by the question. Spend it all: the smallest pot that lasts to the end. Keep it intact: a fixed share of the pot per year.
-  const neededAtStop = intact ? series.find((p) => p.age === retireAge)?.needed ?? null : plan.expected.requiredCorpus * toBasis;
-  const typicalAtStop = view.typicalAtStop * toBasis;
-  const bridge = useMemo(() => bridgeCheck(plan, retireAge, aowAge, view.inflation, basis), [plan, retireAge, aowAge, view.inflation, basis]);
-  const topWarning = plan.warnings.find((w) => w.severity === 'important');
-  const warnParts = topWarning ? topWarning.message.split(/(?<=[.!?])\s+/) : [];
-  const warnFirst = warnParts[0] ?? '';
-  const warnRest = warnParts.slice(1).join(' ');
-  const noSavingsNeeded = plan.expected.requiredCorpus <= 0;
-  // Property sold in the year you stop is part of the corpus on that day.
-  const soldAtStop = plan.expected.rows.filter((r) => r.age === retireAge).reduce((t, r) => t + r.saleProceeds, 0) * (basis === 'today' ? 1 / (1 + view.inflation) ** (retireAge - age) : 1);
 
   const slides: { id: string; title: string; attention: boolean; content: React.ReactNode }[] = [
     {
@@ -644,6 +618,12 @@ function Results(props: {
       <p className="notice" role="note">
         <strong>Beta, a planning estimate.</strong> These are what-if scenarios under stated assumptions, not financial, tax or legal advice. Tax rules are still being checked by advisers. Please check anything important with a licensed adviser before you act on it.
       </p>
+      <div className="pdfRow">
+        <button type="button" className="pdfBtn" onClick={savePdf} disabled={pdf === 'busy'}>
+          {pdf === 'busy' ? 'Preparing your report…' : 'Download PDF report'}
+        </button>
+        <span className="muted small">{pdf === 'error' ? 'The report could not be made. Please try again, and tell us if it keeps failing.' : 'Your plan, inputs and assumptions on a few pages. Made in your browser; nothing is uploaded.'}</span>
+      </div>
       <div className="tabs" role="tablist" aria-label="Results">
         {slides.map((sl, i) => (
           <button key={sl.id} type="button" role="tab" id={`tab-${sl.id}`} aria-selected={!all && slide === i} aria-controls={`slide-${sl.id}`} className={!all && slide === i ? 'tab on' : 'tab'} onClick={() => { setAll(false); go(i); }}>
