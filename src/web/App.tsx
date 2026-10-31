@@ -34,6 +34,17 @@ const FALLBACK_RATE = 90;
 const YEAR = new Date().getFullYear();
 const sameProfile = (a: Profile, b: Profile) => JSON.stringify(a) === JSON.stringify(b);
 
+const GUIDES: [string, string][] = [
+  ['retire-in-india-from-the-netherlands', 'Can I retire in India?'],
+  ['state-pension-and-workplace-pension-abroad', 'Dutch State Pension (AOW) and workplace pensions'],
+  ['30-percent-ruling-ending', '30% ruling ending'],
+  ['indian-assets-box-3', 'Indian assets in Box 3'],
+  ['indian-tax-residency-nri', 'Indian tax status (NRI, RNOR)'],
+  ['how-much-do-i-need-to-retire', 'How much do I need?'],
+  ['inheritance-tax-netherlands-india-assets', 'Inheritance with Indian assets'],
+  ['giving-to-children-while-alive', 'Giving to children while alive'],
+];
+
 export default function App() {
   // "draft" is what is typed in the form. "applied" is what the results were last calculated from.
   const [draft, setDraft] = useState<Profile>(loadProfile);
@@ -160,7 +171,8 @@ export default function App() {
       <header className="top">
         <strong>NRI FinWealth</strong>
         <span className="beta" title="Beta: we are still checking the tax figures with advisers">Beta</span>
-        <a className="topFeedback" href={FEEDBACK_URL} target="_blank" rel="noreferrer">Give feedback</a>
+        <a className="topFeedback" href="/guides/">Guides</a>
+        <a className="topFeedback2" href={FEEDBACK_URL} target="_blank" rel="noreferrer">Give feedback</a>
       </header>
 
       <h1>Where could you retire comfortably: the Netherlands, India, or both?</h1>
@@ -255,6 +267,13 @@ export default function App() {
 
       <footer>
         Planning estimate, not advice. Tax rules as of {shown?.plan.meta.rulesAsOf ?? '2026-10-22'}. Engine v{shown?.plan.meta.engineVersion ?? '2.1.0'} &middot; {shown?.plan.meta.paths ?? 400} simulated futures.
+        <nav className="guideList" aria-label="Guides">
+          <strong>Guides</strong>
+          {GUIDES.map(([slug, label]) => (
+            <a key={slug} href={`/guides/${slug}/`}>{label}</a>
+          ))}
+          <a href="/guides/">All guides</a>
+        </nav>
         <div className="contact">
           <a href={FEEDBACK_URL} target="_blank" rel="noreferrer">Give feedback</a> &middot; <a href="mailto:hello@nrifinwealth.com">hello@nrifinwealth.com</a>
           <br />
@@ -264,7 +283,7 @@ export default function App() {
           <summary>Privacy and disclaimer</summary>
           <p><strong>Your numbers stay with you.</strong> All calculations run in your browser. Nothing you type is sent to a server, and the tool has no account and no tracking of its own. Your answers are saved only in this browser (local storage); clear your site data to remove them. The only outside call fetches the public euro-to-rupee rate; it carries none of your data. Our hosting provider, Cloudflare, keeps standard anonymous traffic counts, as any website host does.</p>
           <p><strong>Beta.</strong> This tool is still being tested and its tax figures are still being checked by advisers. Expect mistakes, and tell us when you find one.</p>
-          <p><strong>Not financial, tax or legal advice.</strong> This is an educational planning tool. It shows what could happen under stated assumptions and gives general what-if scenarios. It does not know your full situation, and it does not recommend any bank, investment product or insurance. Tax rules change (for example the Dutch Box 3 reform), some figures are proposals, and Indian tax and healthcare costs are only partly modelled. Past or simulated results do not predict the future. Check the result with a licensed adviser before you act on it. We accept no liability for decisions made using this tool.</p>
+          <p><strong>Not financial, tax or legal advice.</strong> This is an educational planning tool. It shows what could happen under stated assumptions and gives general what-if scenarios. It does not know your full situation, and it does not recommend any bank, investment product or insurance. Tax rules change (for example the Dutch Box 3 reform), some figures are proposals, and Indian tax is only partly modelled. Past or simulated results do not predict the future. Check the result with a licensed adviser before you act on it. We accept no liability for decisions made using this tool.</p>
           <p><strong>Feedback.</strong> Your numbers never leave this device. If you choose to send feedback, what you write goes to our form provider (Google Forms), so please do not include exact salary, savings or other personal figures.</p>
           <p>nrifinwealth.com is open source under the AGPL-3.0 licence. <a href="https://github.com/sankarraman1307-web/nri-finwealth" target="_blank" rel="noreferrer">Source code</a>. Spotted a wrong rule or number? Please report it there. Questions or feedback: <a href="mailto:hello@nrifinwealth.com">hello@nrifinwealth.com</a>.</p>
         </details>
@@ -394,7 +413,7 @@ function Results(props: {
           })}
         </div>
         <p className="muted small">
-          Chance your money lasts to {horizonAge}, by where you retire. India and Both look better than they are: Indian taxes and healthcare costs are not included yet. Both assumes {view.compareMonths} months a year in India.
+          Chance your money lasts to {horizonAge}, by where you retire. India and Both look better than they are: Indian income tax is not included yet. Both assumes {view.compareMonths} months a year in India.
         </p>
         <div className="legacyRow">
           <span className="lbl" id="legacy-q">What should be left at {horizonAge}?</span>

@@ -355,6 +355,10 @@ footer .about p { margin: 8px 0; line-height: 1.5; }
 .stripOf { font-size: 13px; font-weight: 700; color: var(--muted); }
 footer .contact { margin-top: 8px; }
 .topFeedback { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--teal); }
+.topFeedback2 { margin-left: 14px; font-size: 14px; font-weight: 700; color: var(--teal); }
+footer .guideList { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 14px auto 0; max-width: 720px; font-size: 13px; }
+footer .guideList strong { width: 100%; color: var(--ink); }
+footer .guideList a { color: var(--teal); font-weight: 700; }
 .feedbackPrompt { margin: 8px 0 4px; font-size: 14px; color: var(--muted); text-align: center; }
 .feedbackPrompt a, footer .contact a { color: var(--teal); font-weight: 700; }
 
