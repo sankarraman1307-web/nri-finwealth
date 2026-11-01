@@ -410,14 +410,14 @@ footer .guideList a { color: var(--teal); font-weight: 700; }
 .phrow { display: grid; gap: 14px; padding: 14px 0; border-top: 1px solid #e2e8f0; align-items: start; }
 .phrow.two { grid-template-columns: 130px 1fr 1fr; }
 .phrow.one { grid-template-columns: 130px 1fr; }
-.phhead { border-top: none; padding: 4px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.phhead { display: none; border-top: none; padding: 4px 0; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
 .pname { font-weight: 800; }
 .pname small { display: block; font-weight: 400; color: #64748b; font-size: 12.5px; margin-top: 2px; }
 .pname .linkbtn { display: block; margin-top: 6px; font-size: 13px; }
 .pcell .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pcell .field { margin-bottom: 10px; }
 .pcell .switch.small { padding: 8px 10px; font-size: 13px; margin: 4px 0 8px; font-weight: 600; }
-.cellwho { display: none; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #0f6b73; margin-bottom: 6px; }
+.cellwho { display: block; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #0f6b73; margin-bottom: 6px; }
 .addedhead { margin-top: 14px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
 .addbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed #cbd5e1; }
 .addbar select { height: 44px; border: 1.5px solid #0f6b73; border-radius: 12px; padding: 0 12px; font: inherit; color: #0f6b73; background: #fff; max-width: 100%; }
