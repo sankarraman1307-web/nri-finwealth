@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runPlan, validateInput } from '../src/engine';
+import { runPlan, validateInput, makeContext, DEFAULT_ASSUMPTIONS } from '../src/engine';
 import {
   EMPTY_PROFILE,
   SAMPLE_PROFILE,
@@ -9,6 +9,9 @@ import {
   newProperty,
   parseMoney,
   parseProfile,
+  aowEstimateYearly,
+  isBlankPension,
+  layoutPensions,
   toPlanInput,
   type Profile,
   type PropertyRow,
@@ -687,5 +690,67 @@ describe('recommendations', () => {
     const rec = computeRecommendations(p, { eurToInr: 90, startYear: 2026, paths: 150, seed: 7 })!;
     expect(rec.safe).toBe(true);
     expect(rec.levers.find((l) => l.id === 'retire')!.title).toMatch(/earlier/);
+  });
+});
+
+describe('two state pension (AOW) lines, one per person', () => {
+  const line = (id: string, who: 'you' | 'partner', built: string, amount: string) => ({ ...newPension('aow', id), who, built, amount });
+  it('keeps different values for you and your partner', () => {
+    const v = okOf({ partner: true, pAge: '43', pensions: [line('a', 'you', '6000', '12000'), line('b', 'partner', '3000', '7000')] });
+    expect(v.aowOverride.you).toBeCloseTo(12000, 6);
+    expect(v.aowOverride.partner).toBeCloseTo(7000, 6);
+    const ctx = makeContext(toPlanInput(v, 90, 2026), DEFAULT_ASSUMPTIONS);
+    expect(ctx.aowYouToday).toBeCloseTo(12000, 6);
+    expect(ctx.aowPartnerToday).toBeCloseTo(7000, 6);
+  });
+  it('changing one person leaves the other alone', () => {
+    const a = okOf({ partner: true, pAge: '43', pensions: [line('a', 'you', '6000', '12000'), line('b', 'partner', '3000', '7000')] });
+    const b = okOf({ partner: true, pAge: '43', pensions: [line('a', 'you', '6000', '12000'), line('b', 'partner', '3000', '9000')] });
+    expect(b.aowOverride.you).toBeCloseTo(a.aowOverride.you as number, 6);
+    expect(b.aowOverride.partner).toBeCloseTo(9000, 6);
+  });
+  it('estimates the missing person from the years in the Netherlands', () => {
+    const est = aowEstimateYearly({ ...base, partner: true, pAge: '43', pensions: [line('a', 'you', '6000', '12000')] }, 'partner', 2026);
+    expect(est).not.toBeNull();
+    expect(est as number).toBeGreaterThan(0);
+  });
+});
+
+describe('pensions table', () => {
+  const r = (id: string, kind: Parameters<typeof newPension>[0], who: 'you' | 'partner', over: Partial<ReturnType<typeof newPension>> = {}) => ({ ...newPension(kind, id), who, ...over });
+  it('ignores empty cells, so a half-filled table still runs', () => {
+    const rows = [r('a', 'aow', 'you', { built: '6000', amount: '12000' }), r('b', 'aow', 'partner'), r('c', 'nl-employer', 'you'), r('d', 'annuity', 'partner')];
+    expect(rows.map(isBlankPension)).toEqual([false, true, true, true]);
+    const v = okOf({ partner: true, pAge: '43', pensions: rows });
+    expect(v.aowOverride).toEqual({ you: 12000 });
+    expect(v.incomeStreams).toHaveLength(0);
+  });
+  it('an empty partner line does not ask for the partner age or complain when there is no partner', () => {
+    const rows = [r('b', 'aow', 'partner'), r('c', 'nl-employer', 'partner')];
+    expect(parsedOf({ partner: false, pensions: rows }).ok).toBe(true);
+  });
+  it('a partner line with numbers still needs a partner', () => {
+    expect(parsedOf({ partner: false, pensions: [r('b', 'aow', 'partner', { amount: '7000' })] }).ok).toBe(false);
+  });
+  it('puts lines in the right cells and keeps added rows together', () => {
+    const rows = [
+      r('a', 'aow', 'you', { amount: '1' }),
+      r('b', 'nl-employer', 'partner', { amount: '1' }),
+      r('x', 'in-pension', 'you', { amount: '25000', group: 'g1' }),
+      r('y', 'in-pension', 'partner', { group: 'g1' }),
+      r('legacy', 'other', 'you', { amount: '18000' }),
+      r('dup', 'nl-employer', 'partner', { amount: '2' }),
+    ];
+    const l = layoutPensions(rows);
+    expect(l.cells.aow.you?.id).toBe('a');
+    expect(l.cells['nl-employer'].partner?.id).toBe('b');
+    expect(l.extras.map((e) => e.gid)).toEqual(['g1', 'legacy', 'dup']);
+    expect(l.extras[0]!.you?.id).toBe('x');
+    expect(l.extras[0]!.partner?.id).toBe('y');
+  });
+  it('an Indian pension for me and one for my partner both count, with different amounts', () => {
+    const rows = [r('x', 'in-pension', 'you', { amount: '25000', group: 'g' }), r('y', 'in-pension', 'partner', { amount: '12000', group: 'g' })];
+    const v = okOf({ partner: true, pAge: '43', pensions: rows });
+    expect(v.incomeStreams.map((s) => [s.who, s.monthlyToday])).toEqual([['you', 25000], ['partner', 12000]]);
   });
 });

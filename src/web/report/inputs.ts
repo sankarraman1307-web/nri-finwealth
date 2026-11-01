@@ -1,5 +1,5 @@
 /** "Your inputs": every answer the person gave, in plain words, grouped. Empty answers are skipped. Pure TypeScript. */
-import { ASSUMPTION_FIELDS, formatEurFull, formatInr, parseMoney, type PensionRow, type Profile, type PropertyRow } from './profileApi';
+import { isBlankPension, ASSUMPTION_FIELDS, formatEurFull, formatInr, parseMoney, type PensionRow, type Profile, type PropertyRow } from './profileApi';
 
 export type InputRow = { kind: 'row'; label: string; value: string } | { kind: 'sub'; label: string };
 export interface InputGroup {
@@ -147,8 +147,8 @@ export function inputGroups(p: Profile): InputGroup[] {
   if (p.properties.length > 0) {
     add('Property and mortgages', (o) => p.properties.forEach((r, i) => propertyRows(r, i + 1, o)));
   }
-  if (p.pensions.length > 0) {
-    add('Pensions and other income', (o) => p.pensions.forEach((r, i) => pensionRows(r, i + 1, o)));
+  if (p.pensions.some((r) => !isBlankPension(r))) {
+    add('Pensions and other income', (o) => p.pensions.filter((r) => !isBlankPension(r)).forEach((r, i) => pensionRows(r, i + 1, o)));
   }
 
   add('Your choices', (o) => {

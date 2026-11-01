@@ -1,5 +1,6 @@
 import {
   QUICK_SAVINGS_CASH_SHARE,
+  isBlankPension,
   dutchHomeRow,
   formatEur,
   formatEurFull,
@@ -267,7 +268,7 @@ export interface Booster {
 export function boosters(p: Profile): Booster[] {
   const filled = (...t: string[]) => t.some((x) => x.trim() !== '');
   return [
-    { id: 'pensions', name: 'Pensions', note: 'AOW, company pension', gain: 'Big gain', done: p.pensions.length > 0 },
+    { id: 'pensions', name: 'Pensions', note: 'AOW, company pension', gain: 'Big gain', done: p.pensions.some((r) => !isBlankPension(r)) },
     {
       id: 'savings',
       name: 'Split of your savings',

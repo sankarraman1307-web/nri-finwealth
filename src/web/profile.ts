@@ -2,7 +2,7 @@
  * The quick-start profile: what a person types, how we read it, and how it becomes a PlanInput.
  * Pure TypeScript (no React), so it is easy to test.
  */
-import { countryPack, DEFAULT_ASSUMPTIONS, validateInput, type Assumptions, type AssumptionOverrides, type Destination, type IncomeStream, type MonthlyInvesting, type PartnerEarner, type PlanInput, type Property, type YearlyExpense } from '../engine';
+import { countryPack, DEFAULT_ASSUMPTIONS, makeContext, validateInput, type Assumptions, type AssumptionOverrides, type Destination, type IncomeStream, type MonthlyInvesting, type PartnerEarner, type PlanInput, type Property, type YearlyExpense } from '../engine';
 
 /** One line in the "yearly extras" list, as typed. */
 export interface ExpenseRow {
@@ -72,9 +72,46 @@ export interface PensionRow {
   /** Last age it is paid (own age). Blank = for life. */
   untilAge: string;
   indexed: boolean;
+  /** Rows added with "Add other income" share a group id, so Me and Partner sit side by side. Blank for the three default table rows. */
+  group?: string;
 }
 
 export type PensionErrors = Partial<Record<keyof PensionRow, string>>;
+
+/** A line with nothing typed in it is left out of the plan (the table shows empty cells for everyone). */
+export const isBlankPension = (r: PensionRow): boolean => [r.built, r.amount, r.fromAge, r.untilAge, r.label].every((t) => t.trim() === '');
+
+export const PENSION_TABLE_KINDS = ['aow', 'nl-employer', 'annuity'] as const;
+export type PensionTableKind = (typeof PENSION_TABLE_KINDS)[number];
+export interface PensionExtra {
+  gid: string;
+  kind: PensionRow['kind'];
+  you?: PensionRow;
+  partner?: PensionRow;
+}
+export interface PensionLayout {
+  cells: Record<PensionTableKind, { you?: PensionRow; partner?: PensionRow }>;
+  extras: PensionExtra[];
+}
+
+/** Which line sits in which table cell. Older saved lines without a group are placed by kind and person. */
+export function layoutPensions(rows: PensionRow[]): PensionLayout {
+  const cells: PensionLayout['cells'] = { aow: {}, 'nl-employer': {}, annuity: {} };
+  const extras: PensionExtra[] = [];
+  const isTable = (k: PensionRow['kind']): k is PensionTableKind => (PENSION_TABLE_KINDS as readonly string[]).includes(k);
+  for (const r of rows) {
+    if (r.group) {
+      const hit = extras.find((x) => x.gid === r.group && x.kind === r.kind && !x[r.who]);
+      if (hit) hit[r.who] = r;
+      else extras.push({ gid: r.group, kind: r.kind, [r.who]: r });
+    } else if (isTable(r.kind) && !cells[r.kind][r.who]) {
+      cells[r.kind][r.who] = r;
+    } else {
+      extras.push({ gid: r.id, kind: r.kind, [r.who]: r });
+    }
+  }
+  return { cells, extras };
+}
 
 export function newPension(kind: PensionRow['kind'], id: string): PensionRow {
   return { id, who: 'you', kind, label: '', built: '', amount: '', fromAge: '', untilAge: '', indexed: kind === 'nl-employer' || kind === 'other' || kind === 'aow' };
@@ -496,7 +533,7 @@ function parseProfileCore(p: Profile): ParseResult {
 
   // ----- second earner -----
   // The partner's age is needed whenever the partner earns or has a pension line, and checked whenever it is typed.
-  const partnerHasPension = p.pensions.some((r) => r.who === 'partner');
+  const partnerHasPension = p.pensions.some((r) => r.who === 'partner' && !isBlankPension(r));
   let partnerAge: number | null = null;
   if (p.partner && (p.partnerEarns || partnerHasPension || p.pAge.trim() !== '')) {
     partnerAge = wholeNumber(p.pAge);
@@ -646,6 +683,7 @@ function parseProfileCore(p: Profile): ParseResult {
   const pensionDate = DEFAULT_ASSUMPTIONS.aowAge;
   const pRetireTyped = wholeNumber(p.pRetireAge);
   for (const row of p.pensions) {
+    if (isBlankPension(row)) continue;
     const e: PensionErrors = {};
     const isPartner = row.who === 'partner';
     if (isPartner && !p.partner) e.who = 'Choose "With a partner" under You and your household, or pick "You".';
@@ -673,7 +711,7 @@ function parseProfileCore(p: Profile): ParseResult {
     const until = row.kind === 'nl-employer' || row.kind === 'aow' ? null : ageField(row.untilAge, 'untilAge');
     if (from !== null && until !== null && until < from) e.untilAge = 'It cannot end before it starts.';
     if (isPartner && p.partner && ownerAge === null && !errors.pAge) e.who = "Enter your partner's age under You and your household.";
-    if (row.kind === 'aow' && p.pensions.findIndex((o) => o.kind === 'aow' && o.who === row.who) !== p.pensions.indexOf(row)) e.who = 'You already have a state pension (AOW) line for this person.';
+    if (row.kind === 'aow' && p.pensions.findIndex((o) => o.kind === 'aow' && o.who === row.who && !isBlankPension(o)) !== p.pensions.indexOf(row)) e.who = 'You already have a state pension (AOW) line for this person.';
 
     let monthly = amt ?? 0;
     if (yearly) {
@@ -1044,4 +1082,17 @@ export function mortgageFreeSentence(lastEndAge: number, retireAge: number): str
   if (n > 0) return `You are mortgage-free at ${lastEndAge}, ${num(n)} ${n === 1 ? 'year' : 'years'} after you stop working.`;
   if (n === 0) return `You are mortgage-free at ${lastEndAge}, the year you stop working.`;
   return `You are mortgage-free at ${lastEndAge}, ${num(-n)} ${-n === 1 ? 'year' : 'years'} before you stop working.`;
+}
+
+/**
+ * The state pension (AOW) we would estimate for one person, per year in today's money, ignoring any AOW line they typed.
+ * Null while the form cannot be read yet.
+ */
+export function aowEstimateYearly(p: Profile, who: 'you' | 'partner', startYear: number): number | null {
+  const without = { ...p, pensions: p.pensions.filter((r) => !(r.kind === 'aow' && r.who === who)) };
+  const r = parseProfile(without);
+  if (!r.ok) return null;
+  const ctx = makeContext(toPlanInput(r.value, 90, startYear), DEFAULT_ASSUMPTIONS);
+  const v = who === 'you' ? ctx.aowYouToday : ctx.aowPartnerToday;
+  return v > 0 ? v : null;
 }

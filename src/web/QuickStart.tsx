@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import QuickQuestions, { AccuracyPanel, boosters } from './QuickQuestions';
 import { countryPack } from '../engine';
-import { INDIA_HOME_FACTOR, mortgageSummary, ASSUMPTION_FIELDS, assumptionDefault, newPension, EARLY_PENSION_CUT_PER_YEAR, GOLD_PRICE_AS_OF, withDestination, formatEur, formatEurFull, formatInr, newProperty, parseMoney, type Currency, type Profile, type ProfileErrors, type PensionErrors, type PensionRow, type PropertyErrors, type PropertyRow } from './profile';
+import { aowEstimateYearly, isBlankPension, layoutPensions, PENSION_TABLE_KINDS, type PensionExtra, INDIA_HOME_FACTOR, mortgageSummary, ASSUMPTION_FIELDS, assumptionDefault, newPension, EARLY_PENSION_CUT_PER_YEAR, GOLD_PRICE_AS_OF, withDestination, formatEur, formatEurFull, formatInr, newProperty, parseMoney, type Currency, type Profile, type ProfileErrors, type PensionErrors, type PensionRow, type PropertyErrors, type PropertyRow } from './profile';
 
 interface Props {
   profile: Profile;
@@ -100,7 +101,7 @@ function summaries(p: Profile, eurToInr: number): Record<string, string> {
             const end = ms.lastEndAge === null ? '' : ms.count === 1 ? ` \u00B7 ends at age ${ms.lastEndAge}` : ` \u00B7 the last one ends at age ${ms.lastEndAge}`;
             return `${n} ${n === 1 ? 'property' : 'properties'} \u00B7 ${ms.count} ${ms.count === 1 ? 'mortgage' : 'mortgages'} \u00B7 about ${formatEur(ms.monthlyEur)} a month${end}`;
           })(),
-    pensions: p.pensions.length === 0 ? 'Only the state pension (AOW) so far' : `${p.pensions.length} line${p.pensions.length > 1 ? 's' : ''} added, on top of AOW`,
+    pensions: (() => { const n = p.pensions.filter((r) => !isBlankPension(r)).length; return n === 0 ? 'Only the state pension (AOW) estimate so far' : `${n} pension or income line${n > 1 ? 's' : ''} entered`; })(),
     assumptions: Object.values(p.assumptions).filter((v) => v.trim() !== '').length === 0 ? 'Using the standard assumptions' : `${Object.values(p.assumptions).filter((v) => v.trim() !== '').length} changed by you`,
     retire: p.destination === 'nl' ? 'Netherlands' : p.destination === 'in' ? 'India' : `Both: ${asInt(p.monthsInIndia) ?? '?'} months a year in India`,
   };
@@ -291,24 +292,39 @@ const PENSION_TITLE: Record<PensionRow['kind'], string> = {
   other: 'Other income',
 };
 
-/** One pension or income line, for you or your partner. */
-function PensionCard(props: {
-  row: PensionRow;
+const PENSION_SUB: Partial<Record<PensionRow['kind'], string>> = {
+  aow: 'Blank = we estimate it from the years in the Netherlands',
+  annuity: 'Voluntary, annuity, bank or insurer',
+  'in-pension': 'Monthly, in rupees',
+  other: 'Freelance, business, rent elsewhere. After tax.',
+};
+
+const ADD_TYPES: { value: PensionRow['kind']; label: string }[] = [
+  { value: 'in-pension', label: 'Indian pension' },
+  { value: 'other', label: 'Other income (freelance, business, rent elsewhere)' },
+  { value: 'nl-employer', label: 'Another workplace pension' },
+  { value: 'annuity', label: 'Another private pension' },
+];
+
+/** One cell of the pensions table: one kind of income for one person. An empty cell is saved only once something is typed in it. */
+function PensionCell(props: {
+  kind: PensionRow['kind'];
+  who: 'you' | 'partner';
+  row: PensionRow | undefined;
   errors: PensionErrors;
-  partner: boolean;
   age: number | null;
   retire: number | null;
-  onChange: (patch: Partial<PensionRow>) => void;
-  onRemove: () => void;
+  onPatch: (patch: Partial<PensionRow>) => void;
 }) {
-  const { row, errors: e, partner, age, retire, onChange, onRemove } = props;
-  const id = (k: string) => `${row.id}-${k}`;
-  const inr = row.kind === 'in-pension';
+  const { kind, who, row: saved, errors: e, age, retire, onPatch } = props;
+  const row: PensionRow = saved ?? { ...newPension(kind, `${kind}-${who}`), who };
+  const id = (k: string) => `${kind}-${who}-${saved?.group ?? 'main'}-${k}`;
+  const inr = kind === 'in-pension';
   const cur: Currency = inr ? 'inr' : 'eur';
   const amt = parseMoney(row.amount, cur);
   const built = row.built.trim() === '' ? 0 : parseMoney(row.built, 'eur');
   let note: string | null = null;
-  if ((row.kind === 'nl-employer' || row.kind === 'annuity') && amt !== null && built !== null && amt >= built && row.who === 'you' && age !== null && retire !== null) {
+  if ((kind === 'nl-employer' || kind === 'annuity') && amt !== null && built !== null && amt >= built && who === 'you' && age !== null && retire !== null) {
     const left = Math.max(0, 68 - age);
     const worked = Math.min(left, Math.max(0, retire - age));
     const at = left === 0 ? amt : built + ((amt - built) * worked) / left;
@@ -316,72 +332,155 @@ function PensionCard(props: {
     const cut = Math.max(0, 1 - EARLY_PENSION_CUT_PER_YEAR * Math.max(0, 68 - from));
     note = `If you stop at ${retire}, you keep about ${formatEurFull((at * cut) / 12)} a month in today's money${cut < 1 ? `, after a ${Math.round((1 - cut) * 100)}% cut for starting before 68` : ''}.`;
   }
+  const yearly = kind === 'aow' || kind === 'nl-employer' || kind === 'annuity';
   return (
-    <section className="qcard pcard">
-      <div className="phead">
-        <h3>
-          {PENSION_TITLE[row.kind]} <span className="tag">{row.who === 'you' ? 'You' : 'Partner'}</span>
-        </h3>
-        <button type="button" className="linkbtn" onClick={onRemove} aria-label={`Remove ${PENSION_TITLE[row.kind]}`}>
-          Remove
-        </button>
-      </div>
-      {partner ? (
-        <div className="seg" role="group" aria-label="Whose is it">
-          {(['you', 'partner'] as const).map((w) => (
-            <button key={w} type="button" className={row.who === w ? 'on' : ''} aria-pressed={row.who === w} onClick={() => onChange({ who: w })}>
-              {w === 'you' ? 'Mine' : "My partner's"}
-            </button>
-          ))}
+    <>
+      {yearly ? (
+        <>
+          <Field id={id('built')} label="Built up so far, € a year" value={row.built} onChange={(v) => onPatch({ built: v })} error={e.built} hint={built !== null && built > 0 ? `= ${formatEurFull(built / 12)} a month` : '\u00a0'} />
+          <Field id={id('amount')} label="Payable from age 68, € a year" value={row.amount} onChange={(v) => onPatch({ amount: v })} error={e.amount} hint={amt !== null && !e.amount && amt > 0 ? `= ${formatEurFull(amt / 12)} a month` : '\u00a0'} />
+        </>
+      ) : null}
+      {kind === 'in-pension' ? <Field id={id('amount')} label="Monthly pension, ₹" value={row.amount} onChange={(v) => onPatch({ amount: v })} error={e.amount} hint={amt !== null ? `= ${formatInr(amt)}` : '\u00a0'} /> : null}
+      {kind === 'other' ? (
+        <>
+          <Field id={id('amount')} label="Per year, after tax, €" value={row.amount} onChange={(v) => onPatch({ amount: v })} error={e.amount} hint={'\u00a0'} />
+          <Field id={id('label')} label="What is it" value={row.label} onChange={(v) => onPatch({ label: v })} inputMode="text" />
+        </>
+      ) : null}
+      {kind !== 'aow' ? (
+        <div className="two">
+          <Field id={id('from')} label="Starts at age" value={row.fromAge} onChange={(v) => onPatch({ fromAge: v })} error={e.fromAge} inputMode="numeric" hint={kind === 'in-pension' ? 'Blank = 60' : kind === 'other' ? 'Blank = now' : 'Blank = 68'} />
+          {kind === 'nl-employer' ? <div /> : <Field id={id('until')} label="Ends at age" value={row.untilAge} onChange={(v) => onPatch({ untilAge: v })} error={e.untilAge} inputMode="numeric" hint="Blank = for life" />}
         </div>
       ) : null}
+      {kind !== 'aow' && /^\d+$/.test(row.fromAge.trim()) && Number(row.fromAge) < 63 && yearly ? <div className="note">Starting more than 5 years before 68 is often not allowed. Ask your pension fund first.</div> : null}
+      {saved && !isBlankPension(saved) ? (
+        <label className="switch small">
+          <input type="checkbox" checked={row.indexed} onChange={(ev) => onPatch({ indexed: ev.target.checked })} />
+          <span>{kind === 'other' ? 'Rises with inflation' : 'Adjusted for inflation each year'}</span>
+        </label>
+      ) : null}
       {e.who ? <div className="err">{e.who}</div> : null}
-      {row.kind === 'aow' || row.kind === 'nl-employer' || row.kind === 'annuity' ? (
-        <>
-          <p className="muted small">
-            Find both numbers, gross per year, on <a href="https://www.mijnpensioenoverzicht.nl" target="_blank" rel="noopener noreferrer">mijnpensioenoverzicht.nl</a>.
-            {row.kind === 'aow' ? ' Blank = we estimate your AOW from the years you have lived in the Netherlands.' : ''}
-          </p>
-          <div className="two">
-            <Field id={id('built')} label="Built up so far, € a year" value={row.built} onChange={(v) => onChange({ built: v })} error={e.built} hint={built !== null && built > 0 ? `= ${formatEur(built)} a year, ${formatEurFull(built / 12)} a month` : 'Gross. Blank if unknown.'} />
-            <Field id={id('amount')} label="Payable from age 68, € a year" value={row.amount} onChange={(v) => onChange({ amount: v })} error={e.amount} hint={amt !== null && !e.amount ? `= ${formatEur(amt)} a year, ${formatEurFull(amt / 12)} a month` : 'Gross, at the official pension age.'} />
-          </div>
-          {row.kind !== 'aow' && /^\d+$/.test(row.fromAge.trim()) && Number(row.fromAge) < 63 ? (
-            <div className="note">Starting more than 5 years before 68 is often not allowed. Ask your pension fund first.</div>
-          ) : null}
-          {row.kind === 'aow' ? null : (
-            <div className="two">
-              <Field id={id('from')} label="Starts at age" value={row.fromAge} onChange={(v) => onChange({ fromAge: v })} error={e.fromAge} inputMode="numeric" hint="Blank = 68. Check with your pension fund that starting earlier is allowed. If it is, we cut 6% for every year as a rough guess." />
-              {row.kind === 'annuity' ? <Field id={id('until')} label="Ends at age" value={row.untilAge} onChange={(v) => onChange({ untilAge: v })} error={e.untilAge} inputMode="numeric" hint="Blank = for life." /> : <div />}
-            </div>
-          )}
-        </>
-      ) : null}
-      {row.kind === 'in-pension' ? (
-        <>
-          <div className="two">
-            <Field id={id('amount')} label="Monthly pension, ₹" value={row.amount} onChange={(v) => onChange({ amount: v })} error={e.amount} hint={amt !== null ? `= ${formatInr(amt)}` : undefined} />
-            <Field id={id('from')} label="Starts at age" value={row.fromAge} onChange={(v) => onChange({ fromAge: v })} error={e.fromAge} inputMode="numeric" hint="Blank = 60." />
-          </div>
-          <Field id={id('until')} label="Ends at age" value={row.untilAge} onChange={(v) => onChange({ untilAge: v })} error={e.untilAge} inputMode="numeric" hint="Blank = for life." />
-        </>
-      ) : null}
-      {row.kind === 'other' ? (
-        <>
-          <Field id={id('label')} label="What is it" value={row.label} onChange={(v) => onChange({ label: v })} inputMode="text" />
-          <Field id={id('amount')} label="Per year, after tax, €" value={row.amount} onChange={(v) => onChange({ amount: v })} error={e.amount} hint="Business owners: the amount you take home after tax." />
-          <div className="two">
-            <Field id={id('from')} label="From age" value={row.fromAge} onChange={(v) => onChange({ fromAge: v })} error={e.fromAge} inputMode="numeric" hint="Blank = from now." />
-            <Field id={id('until')} label="Until age" value={row.untilAge} onChange={(v) => onChange({ untilAge: v })} error={e.untilAge} inputMode="numeric" hint="Blank = for life." />
-          </div>
-        </>
-      ) : null}
-      <label className="switch">
-        <input type="checkbox" checked={row.indexed} onChange={(ev) => onChange({ indexed: ev.target.checked })} />
-        <span>{row.kind === 'other' ? 'It rises with inflation' : 'It is adjusted for inflation each year'}</span>
-      </label>
       {note ? <div className="note">{note}</div> : null}
-    </section>
+    </>
+  );
+}
+
+/** The pensions table: AOW, workplace and private pension for you and your partner, plus any lines added below it. */
+function PensionTable(props: {
+  profile: Profile;
+  pensionErrors: Record<string, PensionErrors>;
+  age: number | null;
+  retire: number | null;
+  onChange: (p: Profile) => void;
+}) {
+  const { profile, pensionErrors, age, retire, onChange } = props;
+  const [addType, setAddType] = useState<PensionRow['kind'] | ''>('');
+  const layout = layoutPensions(profile.pensions);
+  const people: ('you' | 'partner')[] = profile.partner ? ['you', 'partner'] : ['you'];
+  const hiddenPartner = !profile.partner && profile.pensions.some((r) => r.who === 'partner' && !isBlankPension(r));
+
+  const patchCell = (kind: PensionRow['kind'], who: 'you' | 'partner', saved: PensionRow | undefined, group: string | undefined, patch: Partial<PensionRow>) => {
+    if (saved) {
+      onChange({ ...profile, pensions: profile.pensions.map((r) => (r.id === saved.id ? { ...r, ...patch } : r)) });
+    } else {
+      const row: PensionRow = { ...newPension(kind, newPropertyId()), who, ...(group ? { group } : {}), ...patch };
+      onChange({ ...profile, pensions: [...profile.pensions, row] });
+    }
+  };
+  const removeGroup = (x: PensionExtra) => onChange({ ...profile, pensions: profile.pensions.filter((r) => r.id !== x.you?.id && r.id !== x.partner?.id) });
+  const addRow = () => {
+    if (addType === '') return;
+    const gid = newPropertyId();
+    const rows = people.map((who) => ({ ...newPension(addType, newPropertyId()), who, group: gid }));
+    onChange({ ...profile, pensions: [...profile.pensions, ...rows] });
+    setAddType('');
+  };
+
+  const filledAow = (who: 'you' | 'partner') => {
+    const r = layout.cells.aow[who];
+    return r !== undefined && !isBlankPension(r);
+  };
+  const aowMissing: 'you' | 'partner' | null = profile.partner && filledAow('you') !== filledAow('partner') ? (filledAow('you') ? 'partner' : 'you') : null;
+  const aowEstimate = aowMissing ? aowEstimateYearly(profile, aowMissing, new Date().getFullYear()) : null;
+
+  const rowBlock = (key: string, title: string, sub: string | undefined, cells: React.ReactNode[], remove?: () => void) => (
+    <div className={`phrow ${profile.partner ? 'two' : 'one'}`} key={key}>
+      <div className="pname">
+        {title}
+        {sub ? <small>{sub}</small> : null}
+        {remove ? (
+          <button type="button" className="linkbtn" onClick={remove}>
+            Remove row
+          </button>
+        ) : null}
+      </div>
+      {cells}
+    </div>
+  );
+  const cellWrap = (who: 'you' | 'partner', key: string, child: React.ReactNode) => (
+    <div className="pcell" key={key}>
+      <span className="cellwho">{who === 'you' ? 'Me' : 'My partner'}</span>
+      {child}
+    </div>
+  );
+
+  return (
+    <div className="ptable">
+      {hiddenPartner ? <div className="err">You have pension lines for your partner. Choose &ldquo;With a partner&rdquo; under You and your household, or clear them.</div> : null}
+      <div className={`phrow phhead ${profile.partner ? 'two' : 'one'}`}>
+        <div />
+        {people.map((w) => (
+          <div key={w}>{w === 'you' ? 'Me' : 'My partner'}</div>
+        ))}
+      </div>
+      {PENSION_TABLE_KINDS.map((kind) =>
+        rowBlock(
+          kind,
+          PENSION_TITLE[kind],
+          PENSION_SUB[kind],
+          people.map((who) => {
+            const saved = layout.cells[kind][who];
+            return cellWrap(who, who, <PensionCell kind={kind} who={who} row={saved} errors={saved ? pensionErrors[saved.id] ?? {} : {}} age={age} retire={retire} onPatch={(patch) => patchCell(kind, who, saved, undefined, patch)} />);
+          }),
+        ),
+      )}
+      {aowMissing ? (
+        <div className="note">
+          {aowMissing === 'partner' ? "Your partner's" : 'Your'} state pension (AOW) is estimated{aowEstimate !== null ? ` at about ${formatEur(aowEstimate)} a year` : ''} from the years in the Netherlands you entered. If {aowMissing === 'partner' ? 'their' : 'your'} record differs, fill in {aowMissing === 'partner' ? 'their' : 'your'} cell above.
+        </div>
+      ) : null}
+      {layout.extras.length > 0 ? <div className="addedhead">Added lines</div> : null}
+      {layout.extras.map((x) =>
+        rowBlock(
+          x.gid,
+          PENSION_TITLE[x.kind],
+          PENSION_SUB[x.kind],
+          people.map((who) => {
+            const saved = x[who];
+            return cellWrap(who, who, <PensionCell kind={x.kind} who={who} row={saved} errors={saved ? pensionErrors[saved.id] ?? {} : {}} age={age} retire={retire} onPatch={(patch) => patchCell(x.kind, who, saved, x.gid, patch)} />);
+          }),
+          () => removeGroup(x),
+        ),
+      )}
+      {layout.extras.length > 0 ? <p className="muted small">Leave a cell empty for anyone who does not have this. Only cells with a number are used.</p> : null}
+      <div className="addbar">
+        <strong>Add other income</strong>
+        <select aria-label="Type of income to add" value={addType} onChange={(ev) => setAddType(ev.target.value as PensionRow['kind'] | '')}>
+          <option value="">Choose type</option>
+          {ADD_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="addgo" disabled={addType === ''} onClick={addRow}>
+          Add
+        </button>
+      </div>
+      <p className="muted small">Adds a row with a cell for each of you, both empty.</p>
+    </div>
   );
 }
 
@@ -580,35 +679,11 @@ export default function QuickStart({ profile, errors, propertyErrors, pensionErr
         <section className="qcard">
           <h3>Pensions and other income</h3>
           <p className="muted">
-            Your state pension (AOW) is estimated from your years in the Netherlands. For a more exact figure, add your AOW line from the pension overview. Add anything else that pays you money later. Amounts are in today&rsquo;s money.
+            Your state pension (AOW) is estimated from your years in the Netherlands. For a more exact figure, fill in the numbers from your pension overview, gross per year, on <a href="https://www.mijnpensioenoverzicht.nl" target="_blank" rel="noopener noreferrer">mijnpensioenoverzicht.nl</a>. Leave a cell empty if it does not apply. Amounts are in today&rsquo;s money.
           </p>
           {errors.pensions ? <div className="err">{errors.pensions}</div> : null}
         </section>
-        {profile.pensions.map((row, i) => (
-          <PensionCard
-            key={row.id}
-            row={row}
-            errors={pensionErrors[row.id] ?? {}}
-            partner={profile.partner}
-            age={age}
-            retire={retire}
-            onChange={(patch) => onChange({ ...profile, pensions: profile.pensions.map((r) => (r.id === row.id ? { ...r, ...patch } : r)) })}
-            onRemove={() => onChange({ ...profile, pensions: profile.pensions.filter((r) => r.id !== row.id) })}
-          />
-        ))}
-        <div className="addrow">
-          {([
-            ['aow', '+ State pension (AOW), from the overview'],
-            ['nl-employer', '+ Workplace pension (Netherlands)'],
-            ['annuity', '+ Voluntary or private pension'],
-            ['in-pension', '+ Indian pension'],
-            ['other', '+ Other income (freelance, business, rent elsewhere)'],
-          ] as const).map(([k, label]) => (
-            <button key={k} type="button" className="addbtn" onClick={() => onChange({ ...profile, pensions: [...profile.pensions, newPension(k, newPropertyId())] })}>
-              {label}
-            </button>
-          ))}
-        </div>
+        <PensionTable profile={profile} pensionErrors={pensionErrors} age={age} retire={retire} onChange={onChange} />
       </Group>
 
       <Group {...grp('spending')}>
