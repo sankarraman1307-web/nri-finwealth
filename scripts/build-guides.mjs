@@ -28,6 +28,7 @@ const head = (title, desc, path, extra = '') => `<!doctype html>
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${SITE}${path}">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="/guides/fonts/manrope-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/guides/guides.css">
 <script src="/guides/guides.js" defer></script>
@@ -37,7 +38,8 @@ const head = (title, desc, path, extra = '') => `<!doctype html>
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="${SITE}/og.png">
 ${extra}</head><body>`;
 
-const header = `<div id="bar"></div><header class="top"><a class="logo" href="/">NRI FinWealth</a><nav><a href="/guides/">Guides</a><a class="pill" href="/">Open the planner</a></nav></header>`;
+const MARK = `<svg class="logoMark" width="30" height="30" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M50 2A48 48 0 0 0 50 98Z" fill="#0f6b73"/><path d="M50 2A48 48 0 0 1 50 98Z" fill="#d9902b"/><g fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M41.7 38.1A16 16 0 1 0 41.7 61.9M11 45.6H38.2M11 54.4H38.2"/><path d="M56.2 34H82.6M56.2 43.6H82.6M62.6 34C85 34 85 54.8 62.6 54.8L79.4 69.2"/></g></svg>`;
+const header = `<div id="bar"></div><header class="top"><a class="logo" href="/">${MARK}<span><span class="bn">NRI</span> FinWealth</span></a><nav><a href="/guides/">Guides</a><a class="pill" href="/">Open the planner</a></nav></header>`;
 const footer = `<footer><div class="in">
 <div><h4>Guides</h4>${PAGES.slice(0, 4).map((p) => `<a href="/guides/${p.slug}/">${esc(p.short)}</a>`).join('')}</div>
 <div><h4>More guides</h4>${PAGES.slice(4).map((p) => `<a href="/guides/${p.slug}/">${esc(p.short)}</a>`).join('')}</div>
@@ -47,7 +49,7 @@ const footer = `<footer><div class="in">
 for (const p of PAGES) {
   const path = `/guides/${p.slug}/`;
   const ld = [
-    { '@context': 'https://schema.org', '@type': 'Article', headline: p.title, description: p.description, dateModified: CHECKED_ISO, datePublished: CHECKED_ISO, mainEntityOfPage: SITE + path, publisher: { '@type': 'Organization', name: 'NRI FinWealth', url: SITE } },
+    { '@context': 'https://schema.org', '@type': 'Article', headline: p.title, description: p.description, dateModified: CHECKED_ISO, datePublished: CHECKED_ISO, mainEntityOfPage: SITE + path, publisher: { '@type': 'Organization', name: 'NRI FinWealth', url: SITE, logo: { '@type': 'ImageObject', url: SITE + '/icon-512.png' } } },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: p.faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
     { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE + '/' },

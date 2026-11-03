@@ -436,3 +436,8 @@ footer .guideList a { color: var(--teal); font-weight: 700; }
 @container (max-width: 300px) {
   .phrow.two { grid-template-columns: 1fr; }
 }
+
+/* Brand */
+.brand { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; letter-spacing: -0.01em; }
+.brand .bn { color: #0f6b73; }
+.logoMark { flex-shrink: 0; display: block; }

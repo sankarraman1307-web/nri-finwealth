@@ -58,6 +58,16 @@ const SWAPS: [RegExp, string][] = [
   [/ /g, ' '],
 ];
 
+/** The logo coin, drawn as vectors (pdf-lib paths point downward from the top-left corner). `scale` 0.2 makes it 20 pt wide. */
+function drawMark(pg: PDFPage, x: number, top: number, scale: number): void {
+  const amber = rgb(217 / 255, 144 / 255, 43 / 255);
+  pg.drawSvgPath('M50 2A48 48 0 0 0 50 98Z', { x, y: top, scale, color: C.teal });
+  pg.drawSvgPath('M50 2A48 48 0 0 1 50 98Z', { x, y: top, scale, color: amber });
+  const stroke = { x, y: top, scale, borderColor: C.white, borderWidth: 6 * scale, borderLineCap: 1 as const };
+  pg.drawSvgPath('M41.7 38.1A16 16 0 1 0 41.7 61.9M11 45.6H38.2M11 54.4H38.2', stroke);
+  pg.drawSvgPath('M56.2 34H82.6M56.2 43.6H82.6M62.6 34C85 34 85 54.8 62.6 54.8L79.4 69.2', stroke);
+}
+
 export class Doc {
   pdf!: PDFDocument;
   fonts!: Fonts;
@@ -256,7 +266,8 @@ export class Doc {
     const pages = this.pdf.getPages();
     pages.forEach((pg, i) => {
       this.page = pg;
-      this.drawLine('NRI FinWealth', M.left, 24, 11, 'extra', C.teal);
+      drawMark(pg, M.left, A4.h - 17, 0.2);
+      this.drawLine('NRI FinWealth', M.left + 27, 24, 11, 'extra', C.teal);
       this.drawRight(o.right, A4.w - M.right, 26, 8.5, 'regular', C.muted);
       pg.drawLine({ start: { x: M.left, y: A4.h - 44 }, end: { x: A4.w - M.right, y: A4.h - 44 }, thickness: 1.2, color: C.teal });
       pg.drawLine({ start: { x: M.left, y: M.bottom - 8 }, end: { x: A4.w - M.right, y: M.bottom - 8 }, thickness: 0.5, color: C.line });

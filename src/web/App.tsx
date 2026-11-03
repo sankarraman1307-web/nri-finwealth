@@ -1,3 +1,4 @@
+import { LogoMark } from './Logo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Destination } from '../engine';
 import { computeView, type View } from './compute';
@@ -171,7 +172,12 @@ export default function App() {
   return (
     <main className="page">
       <header className="top">
-        <strong>NRI FinWealth</strong>
+        <strong className="brand">
+          <LogoMark size={32} />
+          <span>
+            <span className="bn">NRI</span> FinWealth
+          </span>
+        </strong>
         <span className="beta" title="Beta: we are still checking the tax figures with advisers">Beta</span>
         <a className="topFeedback" href="/guides/">Guides</a>
         <a className="topFeedback2" href={FEEDBACK_URL} target="_blank" rel="noreferrer">Give feedback</a>
