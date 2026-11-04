@@ -1,5 +1,5 @@
 import { inBox3, isSold, loanBalance, propertiesOf, valueEur } from './properties';
-import { countryPack } from './countries';
+import { countryPack, householdWageTax, type Earner } from './countries';
 import { makeNormal, mulberry32 } from './rng';
 import type { AssetClass, Assumptions, PlanInput, Pots, YearRow } from './types';
 import { ASSET_CLASSES } from './types';
@@ -87,9 +87,9 @@ export function makeContext(input: PlanInput, a: Assumptions): SimContext {
   const rules = countryPack(input.country).rulesFor(input.startYear);
   const persons = input.familyStatus === 'partner' ? 2 : 1;
   const perPerson =
-    input.familyStatus === 'partner' ? rules.aow.partnerMonthlyGrossEach : rules.aow.singleMonthlyGross;
+    input.familyStatus === 'partner' ? rules.statePension.partnerMonthlyGrossEach : rules.statePension.singleMonthlyGross;
   const fullAnnual = perPerson * persons * 12;
-  const accrualShare = aowAccrualYears(input, a) / rules.aow.fullAccrualYears;
+  const accrualShare = aowAccrualYears(input, a) / rules.statePension.fullAccrualYears;
   const ov = input.aowAnnualOverride;
   let aowTotal = fullAnnual * accrualShare;
   if (ov) {
@@ -262,23 +262,17 @@ export function stepYear(
 
   // ---------- Income ----------
   let salaryGross = 0;
-  let incomeTaxNl = 0;
+  const earners: Earner[] = [];
   if (!retired) {
     salaryGross = i.grossSalary * (1 + a.wageGrowth) ** t;
-    const rulingActive = t < i.rulingYearsLeft;
-    incomeTaxNl = pack.tax.wage(salaryGross, rules, priceNl, {
-      active: rulingActive,
-      grandfathered: i.rulingGrandfathered,
-    }).tax;
+    earners.push({ gross: salaryGross, ruling: { active: t < i.rulingYearsLeft, grandfathered: i.rulingGrandfathered } });
   }
   let partnerSalaryGross = 0;
   if (pe && partnerWorking) {
     partnerSalaryGross = pe.grossSalary * (1 + a.wageGrowth) ** t;
-    incomeTaxNl += pack.tax.wage(partnerSalaryGross, rules, priceNl, {
-      active: t < pe.rulingYearsLeft,
-      grandfathered: pe.rulingGrandfathered,
-    }).tax;
+    earners.push({ gross: partnerSalaryGross, ruling: { active: t < pe.rulingYearsLeft, grandfathered: pe.rulingGrandfathered } });
   }
+  const incomeTaxNl = earners.length > 0 ? householdWageTax(pack, earners, rules, priceNl) : 0;
 
   // AOW and the older single pension fields are counted from retirement. (Working past AOW age is rare;
   // ignoring AOW then is conservative.)

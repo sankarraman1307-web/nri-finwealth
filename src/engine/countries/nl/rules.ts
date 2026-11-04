@@ -6,6 +6,8 @@
  * and surfaces to the user as a warning, so estimates never masquerade as facts.
  */
 
+import type { CountryRules, StatePensionRules } from '../types';
+
 export const RULES_AS_OF = '2026-10-22';
 
 export interface Bracket {
@@ -13,7 +15,7 @@ export interface Bracket {
   rate: number;
 }
 
-export interface NlRulesYear {
+export interface NlRulesYear extends CountryRules {
   year: number;
   box1: {
     /** Combined income tax + social premiums, below AOW age. */
@@ -36,16 +38,20 @@ export interface NlRulesYear {
     otherReturn: number;
     debtReturn: number;
   };
-  aow: {
-    singleMonthlyGross: number;
-    partnerMonthlyGrossEach: number;
-    fullAccrualYears: number;
-  };
+  /** The AOW. Same object as `statePension`, kept under its Dutch name. */
+  aow: StatePensionRules;
   unverified: string[];
   sources: string[];
 }
 
 const INF = Number.POSITIVE_INFINITY;
+
+const AOW_2026: StatePensionRules = {
+  // SVB gross amounts from 1 July 2026 (excl. holiday allowance).
+  singleMonthlyGross: 1662.16,
+  partnerMonthlyGrossEach: 1139.39,
+  fullAccrualYears: 50,
+};
 
 const NL_2026: NlRulesYear = {
   year: 2026,
@@ -70,12 +76,8 @@ const NL_2026: NlRulesYear = {
     otherReturn: 0.06,
     debtReturn: 0.027,
   },
-  aow: {
-    // SVB gross amounts from 1 July 2026 (excl. holiday allowance).
-    singleMonthlyGross: 1662.16,
-    partnerMonthlyGrossEach: 1139.39,
-    fullAccrualYears: 50,
-  },
+  aow: AOW_2026,
+  statePension: AOW_2026,
   unverified: [
     'AOW-age first-bracket rate (17.85%) is an estimate',
     'Heffingskortingen (general and labour tax credits) are not modelled',
