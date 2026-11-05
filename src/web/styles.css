@@ -322,6 +322,8 @@ footer .about p { margin: 8px 0; line-height: 1.5; }
 .gate h2 { margin-top: 0; }
 .verdictCard { display: block; }
 .verdictCard h2 { font-size: 24px; margin: 10px 0 14px; }
+.mcLine { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.mcLine .linkbtn { font-size: 13px; }
 .verdictCard .lead { margin: 10px 0 0; font-size: 16px; font-weight: 600; }
 .verdictCard .detailLine { margin: 10px 0 0; font-size: 14px; color: #334155; }
 .meter { margin: 6px 0 14px; }

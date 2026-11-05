@@ -300,7 +300,7 @@ export default function App() {
       })()}
 
       <footer>
-        Planning estimate, not advice. Tax rules as of {shown?.plan.meta.rulesAsOf ?? '2026-10-22'}. Engine v{shown?.plan.meta.engineVersion ?? '2.1.0'} &middot; {shown?.plan.meta.paths ?? 400} simulated futures.
+        Planning estimate, not advice. Tax rules as of {shown?.plan.meta.rulesAsOf ?? '2026-10-22'}. Engine v{shown?.plan.meta.engineVersion ?? '2.1.0'} &middot; {shown?.plan.meta.paths ?? 400} Monte Carlo simulations.
         <nav className="guideList" aria-label="Guides">
           <strong>Guides</strong>
           {GUIDES.map(([slug, label]) => (
@@ -343,6 +343,11 @@ function Results(props: {
 }) {
   const { view, destination, setDestination, setLegacy, nudge, profile, eurToInr, startYear, onApply, onUndo, canUndo } = props;
   const { plan, ruling, compare, curve, monthly, retireAge, age, aowAge } = view;
+  const howtoRef = useRef<HTMLDetailsElement>(null);
+  const openHowto = () => {
+    if (howtoRef.current) howtoRef.current.open = true;
+    howtoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const [basis, setBasis] = useState<EuroBasis>('future');
   const [slide, setSlide] = useState<number>(() => {
     const m = /^#s(\d)$/.exec(typeof window === 'undefined' ? '' : window.location.hash);
@@ -406,6 +411,10 @@ function Results(props: {
             <span>100</span>
           </div>
         </div>
+        <p className="mcLine">
+          Based on {plan.meta.paths} Monte Carlo simulations.{' '}
+          <button type="button" className="linkbtn" onClick={openHowto}>How to read this &darr;</button>
+        </p>
         <div className="placeTiles" role="radiogroup" aria-label="Where you retire. Each shows the chance your money lasts.">
           {compare.map((c) => {
             const on = c.destination === destination;
@@ -453,10 +462,16 @@ function Results(props: {
                 : ''
             : ''}
         </p>
-        <details className="howto">
+        <details className="howto" ref={howtoRef}>
           <summary>How to read this</summary>
           <p className="muted small">
-            We replay 100 different versions of the future, with good and bad markets and different inflation. Your money has to last until age {horizonAge}, so you are covered if you live long. Change this under Assumptions: &ldquo;Plan for me to live until age&rdquo;. Amounts are in today&rsquo;s money. Property you keep is counted separately, as a family reserve.
+            This result comes from a Monte Carlo simulation. We replay your plan {plan.meta.paths} times, each with a different random run of good and bad years for your investments and for the rupee. The number is how many of those futures still have money left at age {horizonAge}.
+          </p>
+          <p className="muted small">
+            It is a stress test, not a prediction: bad years early in retirement hurt much more than bad years late. Inflation is the same in every run: it comes from your Assumptions. The same inputs give the same result every time.
+          </p>
+          <p className="muted small">
+            You can change the age under Assumptions: &ldquo;Plan for me to live until age&rdquo;. Amounts are in today&rsquo;s money. Property you keep is counted separately, as a family reserve.
           </p>
         </details>
       </section>

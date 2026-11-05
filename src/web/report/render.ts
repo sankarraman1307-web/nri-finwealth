@@ -263,6 +263,7 @@ function whatIfBlock(doc: Doc, m: ReportModel): void {
 function assumptionsBlock(doc: Doc, m: ReportModel): void {
   doc.h2('Assumptions used', 90);
   doc.text('Standard assumptions unless marked "changed". You can change them in the planner under Assumptions.', { size: 9, color: C.muted, gapAfter: 6 });
+  doc.text(`How the result is worked out: a Monte Carlo simulation replays your plan through ${m.paths} random investment and rupee paths, using a fixed random seed, so the same inputs give the same answer. It is a stress test, not a prediction.`, { size: 9, color: C.muted, gapAfter: 6 });
   doc.table({
     cols: [260, 90, CONTENT_W - 350],
     head: ['Assumption', 'Used', ''],
