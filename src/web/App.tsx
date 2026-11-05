@@ -259,19 +259,45 @@ export default function App() {
         </div>
       </div>
 
-      {shown ? (
-        <div className="liveBar" role="region" aria-label="Your answer so far">
-          <div className="liveText">
-            <span className={`badge ${VERDICT[shown.plan.verdict].className}`}>Verdict: {VERDICT[shown.plan.verdict].label}</span>
-            <strong>
-              If you live to {shown.age + shown.plan.meta.horizonYears}, your money lasts in {Math.round(shown.plan.monteCarlo.successProbability * 100)} of 100 possible future scenarios
-            </strong>
+      {(() => {
+        // One bar for phones (hidden on wide screens by CSS): the next useful action is always the button.
+        const stale = dirty && !(auto && draftParsed.ok);
+        const verdictText = shown
+          ? `If you live to ${shown.age + shown.plan.meta.horizonYears}, your money lasts in ${Math.round(shown.plan.monteCarlo.successProbability * 100)} of 100 possible future scenarios`
+          : '';
+        const seeDetails = () => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!shown) {
+          return (
+            <div className="liveBar" role="region" aria-label="Run the simulation">
+              <div className="liveText">
+                <span className="liveState" role="status">{running ? 'Running\u2026' : 'Ready when you are'}</span>
+                <span className="liveSub">{savingsAnswered(draft) ? 'Press Run to see your answer' : 'Answer the quick questions first'}</span>
+              </div>
+              <button type="button" className="run" disabled={running} onClick={run}>{running ? 'Running\u2026' : 'Run simulation'}</button>
+            </div>
+          );
+        }
+        if (stale) {
+          return (
+            <div className="liveBar" role="region" aria-label="Run the simulation">
+              <div className="liveText">
+                <span className="liveState dirty" role="status">{running ? 'Running\u2026' : 'Changes not applied yet'}</span>
+                <span className="liveSub">Last run: {Math.round(shown.plan.monteCarlo.successProbability * 100)} of 100 scenarios work</span>
+              </div>
+              <button type="button" className="run" disabled={running} onClick={run}>{running ? 'Running\u2026' : 'Run simulation'}</button>
+            </div>
+          );
+        }
+        return (
+          <div className="liveBar" role="region" aria-label="Your answer so far">
+            <div className="liveText">
+              <span className={`badge ${VERDICT[shown.plan.verdict].className}`}>Verdict: {VERDICT[shown.plan.verdict].label}</span>
+              <strong>{verdictText}</strong>
+            </div>
+            <button type="button" className="run" onClick={seeDetails}>See details</button>
           </div>
-          <button type="button" className="run" onClick={() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-            See details
-          </button>
-        </div>
-      ) : null}
+        );
+      })()}
 
       <footer>
         Planning estimate, not advice. Tax rules as of {shown?.plan.meta.rulesAsOf ?? '2026-10-22'}. Engine v{shown?.plan.meta.engineVersion ?? '2.1.0'} &middot; {shown?.plan.meta.paths ?? 400} simulated futures.
